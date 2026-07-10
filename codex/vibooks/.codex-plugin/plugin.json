@@ -1,0 +1,53 @@
+{
+  "name": "vibooks",
+  "version": "0.2.0",
+  "description": "AI bookkeeping for small businesses, from source documents to reconciled books.",
+  "author": {
+    "name": "Block Software Inc.",
+    "url": "https://vibooks.ai/"
+  },
+  "homepage": "https://vibooks.ai/",
+  "license": "Proprietary",
+  "keywords": [
+    "vibooks",
+    "bookkeeping",
+    "small-business",
+    "receipts",
+    "invoices",
+    "bills",
+    "bank-reconciliation",
+    "month-end",
+    "accounting",
+    "local-first",
+    "ai-agent"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Vibooks",
+    "shortDescription": "AI bookkeeping from source documents to reconciled books",
+    "longDescription": "Turn receipts, bills, invoices, and bank or card statements into source-linked bookkeeping in Vibooks. Set up books, record transactions through proper workflows, reconcile accounts, review exceptions, and prepare month-end reports with your own AI agent. Books stay on your device by default, and writes remain controlled and reviewable.",
+    "developerName": "Block Software Inc.",
+    "category": "Finance",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://vibooks.ai/",
+    "privacyPolicyURL": "https://vibooks.ai/privacy/",
+    "termsOfServiceURL": "https://vibooks.ai/terms/",
+    "defaultPrompt": [
+      "Set up Vibooks on this computer and verify it is ready for bookkeeping.",
+      "Record the receipts, bills, invoices, and statements in this folder in Vibooks.",
+      "Reconcile my bank and card statements and prepare a month-end review."
+    ],
+    "brandColor": "#6D28D9",
+    "composerIcon": "./assets/composer-icon.png",
+    "logo": "./assets/logo.png",
+    "screenshots": [
+      "./assets/overview-hero.png",
+      "./assets/journal-real.png"
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}

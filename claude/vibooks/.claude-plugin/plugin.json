@@ -1,0 +1,27 @@
+{
+  "name": "vibooks",
+  "displayName": "Vibooks",
+  "version": "0.2.0",
+  "description": "AI bookkeeping for small businesses, from source documents to reconciled books.",
+  "author": {
+    "name": "Block Software Inc.",
+    "url": "https://vibooks.ai/"
+  },
+  "homepage": "https://vibooks.ai/",
+  "license": "Proprietary",
+  "keywords": [
+    "vibooks",
+    "bookkeeping",
+    "small-business",
+    "receipts",
+    "invoices",
+    "bills",
+    "bank-reconciliation",
+    "month-end",
+    "accounting",
+    "local-first",
+    "ai-agent"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}

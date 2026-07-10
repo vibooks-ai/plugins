@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "vibooks": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "./scripts/vibooks-mcp.mjs"
+      ],
+      "cwd": ".",
+      "env_vars": [
+        "VIBOOKS_CLI",
+        "VIBOOKS_BASE_URL",
+        "VIBOOKS_TOKEN",
+        "VIBOOKS_MCP_TIMEOUT_MS",
+        "VIBOOKS_MCP_MAX_OUTPUT_BYTES"
+      ],
+      "startup_timeout_sec": 10,
+      "tool_timeout_sec": 60
+    }
+  }
+}
