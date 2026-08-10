@@ -14,6 +14,7 @@
 - The Codex plugin version lives in `codex/vibooks/.codex-plugin/plugin.json`.
 - The Claude Code plugin version lives in `claude/vibooks/.claude-plugin/plugin.json`.
 - The `agent-plugin` release train must keep all three version fields identical and publish one repository tag for the portable package and both wrappers.
+- In the standalone public repository, update all three manifests with `npm run version:set -- X.Y.Z`. In the private workspace, the root release-train script remains authoritative and must produce the same result.
 - Canonical plugin release tags use `vX.Y.Z` or `vX.Y.Z-rc.N`.
 - Bump the `agent-plugin` version across the portable manifest and both wrappers whenever plugin metadata, marketplace packaging, MCP tools, bundled assets, bundled skill content, or plugin-specific workflow instructions change.
 - Treat `skills/vibooks/` as a packaged public copy. Make durable workflow edits in the upstream Vibooks skill source first, then refresh this repo's public copy.
@@ -23,4 +24,6 @@
 - Public plugin wrappers may link to repository-root portable content, but every link must resolve inside this public repo and must not reference unpublished workspace-only siblings.
 - Plugin MCP tools must go through `vibooks-cli` or official Vibooks HTTP APIs only. Do not add direct database, runtime-file, or entitlement-bypass access to the plugin.
 - Keep write-capable tools opt-in and explicit. Mutation-capable MCP tools must require a confirmation parameter or equivalent agent approval boundary before calling non-read-only Vibooks operations.
-- Before calling a plugin release ready, validate root `plugin.json` and `mcp.json` against the vendored official Agent Plugins schemas, run the current Codex plugin validator on `codex/vibooks`, run `scripts/check-public-plugin-content.sh`, run `node --test runtime/test-vibooks-mcp.mjs`, validate `claude/vibooks` with Claude Code when available, and verify the Codex wrapper materialized copies match the repository-root portable core.
+- MCP stdio messages must use newline-delimited JSON-RPC framing. Keep a process-level test that sends a standards-compliant initialize request through the packaged entrypoint; do not replace it with `Content-Length` framing.
+- Update-status network requests must remain limited to approved HTTPS manifests on `vibooks.ai`, must reject redirects, and must never provide an agent-controlled request path to loopback, private-network, or arbitrary hosts.
+- Before calling a plugin release ready, run `npm run check`, validate the Codex wrapper with the current Codex plugin validator, validate the Claude marketplace and plugin with Claude Code when available, perform clean marketplace installs for both wrappers, and verify their installed MCP entrypoints with standards-compliant stdio messages.

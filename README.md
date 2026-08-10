@@ -19,21 +19,23 @@ before non-read-only operations.
 
 The repository root implements the
 [Agent Plugins 1.0.0 specification](https://agent-plugins.org/specification).
-Compatible clients can install this Git repository directly or load the cloned
-repository root as a local plugin. The portable package includes Agent Skills
-and a local stdio MCP server. The MCP server requires Node.js 18 or later.
+Install `https://github.com/vibooks-ai/plugins` as a Git-backed plugin, or clone
+the repository and load its root as a local plugin. The portable package
+includes Agent Skills and a local stdio MCP server. The MCP server requires
+Node.js 18 or later.
 
 The portable package is currently intended for clients listed by the Agent
 Plugins project, including VS Code, Cursor, GitHub Copilot, ChatGPT and Codex,
-and Kiro. Client-specific installation and distribution remain controlled by
-each client.
+Kiro, Hermes Agent, and OpenClaw. Follow the
+[client-specific setup instructions](https://agent-plugins.org/compatible-clients)
+for discovery and installation.
 
 ## Install For Codex
 
-From the repository root:
+From any directory:
 
 ```bash
-codex plugin marketplace add .
+codex plugin marketplace add vibooks-ai/plugins
 codex plugin add vibooks@vibooks
 ```
 
@@ -42,10 +44,10 @@ ask for one of its bookkeeping workflows in plain language.
 
 ## Install For Claude Code
 
-From the repository root:
+From any directory:
 
 ```bash
-claude plugin marketplace add .
+claude plugin marketplace add vibooks-ai/plugins
 claude plugin install vibooks@vibooks
 ```
 
@@ -70,6 +72,7 @@ Reload plugins after installation. Task-oriented skills include:
 - `codex/vibooks/`: materialized Codex wrapper.
 - `claude/vibooks/`: Claude Code wrapper linked to the portable core.
 - `.agents/` and `.claude-plugin/`: standalone marketplace entries.
+- `.github/workflows/`: public repository validation.
 - `submission/`: public marketplace submission materials.
 - `scripts/`: synchronization, validation, and release checks.
 
@@ -88,12 +91,43 @@ Install maintainer-only validation dependencies once:
 npm ci
 ```
 
-Then run:
+Then run the complete portable check:
 
 ```bash
-npm run validate:agent-plugin
+npm run check
+```
+
+When the platform CLIs are available, also run:
+
+```bash
 python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/plugin-creator/scripts/validate_plugin.py" codex/vibooks
-scripts/check-public-plugin-content.sh
-node --test runtime/test-vibooks-mcp.mjs
+claude plugin validate --strict .
 claude plugin validate --strict claude/vibooks
 ```
+
+## Release
+
+Use one version for the portable package and both wrappers:
+
+```bash
+npm run version:set -- 0.3.1
+scripts/sync-codex-wrapper.sh
+npm run check
+git tag v0.3.1
+```
+
+Push the commit before its matching tag. GitHub Actions runs the portable
+release checks for pull requests, `main`, and version tags.
+
+## Support And Security
+
+- Product and installation support: https://vibooks.ai/support/
+- Agent setup guide: https://vibooks.ai/agents/
+- Private vulnerability reports: see [SECURITY.md](SECURITY.md)
+
+## License
+
+This repository is licensed under the Apache License 2.0. The license covers
+the plugin code, packaged skills, and repository documentation. It does not
+grant rights to the Vibooks application, hosted services, product licenses, or
+Block Software Inc. trademarks.

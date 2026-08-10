@@ -3,7 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "validate:agent-plugin": "node scripts/validate-agent-plugin.mjs"
+    "check": "npm run validate:agent-plugin && npm run check:public && npm test",
+    "check:public": "bash scripts/check-public-plugin-content.sh",
+    "test": "node --test runtime/test-vibooks-mcp.mjs",
+    "validate:agent-plugin": "node scripts/validate-agent-plugin.mjs",
+    "version:set": "node scripts/set-version.mjs"
   },
   "devDependencies": {
     "ajv": "8.20.0"

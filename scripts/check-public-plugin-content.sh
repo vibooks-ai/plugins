@@ -18,10 +18,15 @@ fi
 PATTERN='(/Users/|/private/var/folders|/var/folders|C:\\Users\\|-----BEGIN [A-Z ]*PRIVATE KEY-----|sk_live_|rk_live_|ghp_|github_pat_|AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16})'
 SIBLING_PATTERN='(vibooks-skills/|vibooks-app/|vibooks-server/|vibooks-website/|\.\./vibooks)'
 SCAN_ROOTS=(
+  ".github"
+  ".gitignore"
   ".agents"
   ".claude-plugin"
   "AGENTS.md"
+  "CHANGELOG.md"
+  "LICENSE"
   "README.md"
+  "SECURITY.md"
   "plugin.json"
   "mcp.json"
   "package.json"
@@ -45,6 +50,7 @@ PUBLIC_DOC_ROOTS=(
   "codex/vibooks"
 )
 MATERIALIZED_DIRS=(assets docs runtime skills)
+MATERIALIZED_FILES=(LICENSE)
 
 if [[ "$(jq -r '.name' "${PLUGIN_ROOT}/plugin.json")" != "vibooks" ]] ||
    [[ "$(jq -r '.["$schema"]' "${PLUGIN_ROOT}/plugin.json")" != "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json" ]] ||
@@ -57,6 +63,34 @@ PORTABLE_VERSION="$(jq -r '.version' "${PLUGIN_ROOT}/plugin.json")"
 if [[ "$(jq -r '.version' "${CODEX_ROOT}/.codex-plugin/plugin.json")" != "${PORTABLE_VERSION}" ]] ||
    [[ "$(jq -r '.version' "${PLUGIN_ROOT}/claude/vibooks/.claude-plugin/plugin.json")" != "${PORTABLE_VERSION}" ]]; then
   echo "Portable, Codex, and Claude plugin versions must remain identical." >&2
+  exit 1
+fi
+
+REPOSITORY_URL="https://github.com/vibooks-ai/plugins"
+HOMEPAGE_URL="https://vibooks.ai/agents/"
+for manifest in \
+  "${PLUGIN_ROOT}/plugin.json" \
+  "${CODEX_ROOT}/.codex-plugin/plugin.json" \
+  "${PLUGIN_ROOT}/claude/vibooks/.claude-plugin/plugin.json"; do
+  if [[ "$(jq -r '.license' "${manifest}")" != "Apache-2.0" ]] ||
+     [[ "$(jq -r '.repository' "${manifest}")" != "${REPOSITORY_URL}" ]] ||
+     [[ "$(jq -r '.homepage' "${manifest}")" != "${HOMEPAGE_URL}" ]]; then
+    echo "Public plugin manifests must use the canonical license, repository, and agent-guide homepage: ${manifest}" >&2
+    exit 1
+  fi
+done
+
+if [[ "$(jq -r '.plugins[0].license' "${PLUGIN_ROOT}/.claude-plugin/marketplace.json")" != "Apache-2.0" ]] ||
+   [[ "$(jq -r '.plugins[0].repository' "${PLUGIN_ROOT}/.claude-plugin/marketplace.json")" != "${REPOSITORY_URL}" ]] ||
+   [[ "$(jq -r '.plugins[0].homepage' "${PLUGIN_ROOT}/.claude-plugin/marketplace.json")" != "${HOMEPAGE_URL}" ]]; then
+  echo "Claude marketplace metadata must use the canonical license, repository, and agent-guide homepage." >&2
+  exit 1
+fi
+
+if [[ ! -f "${PLUGIN_ROOT}/LICENSE" ]] ||
+   ! grep -q "Apache License" "${PLUGIN_ROOT}/LICENSE" ||
+   ! grep -q '^node_modules/$' "${PLUGIN_ROOT}/.gitignore"; then
+  echo "Standalone repository must include its Apache-2.0 license and ignore node_modules." >&2
   exit 1
 fi
 
@@ -99,6 +133,25 @@ for dir in "${MATERIALIZED_DIRS[@]}"; do
     exit 1
   fi
 done
+
+for file in "${MATERIALIZED_FILES[@]}"; do
+  if ! cmp -s "${PLUGIN_ROOT}/${file}" "${CODEX_ROOT}/${file}" ||
+     ! cmp -s "${PLUGIN_ROOT}/${file}" "${PLUGIN_ROOT}/claude/vibooks/${file}"; then
+    echo "Platform wrapper copy is out of sync with the portable core: ${file}" >&2
+    echo "Run scripts/sync-codex-wrapper.sh after editing portable plugin content." >&2
+    exit 1
+  fi
+done
+
+if command -v rg >/dev/null 2>&1; then
+  if rg -n 'Content-Length' "${PLUGIN_ROOT}/runtime/vibooks-mcp.mjs" >/dev/null; then
+    echo "MCP stdio transport must use newline-delimited JSON-RPC, not Content-Length framing." >&2
+    exit 1
+  fi
+elif grep -n 'Content-Length' "${PLUGIN_ROOT}/runtime/vibooks-mcp.mjs" >/dev/null; then
+  echo "MCP stdio transport must use newline-delimited JSON-RPC, not Content-Length framing." >&2
+  exit 1
+fi
 
 if command -v rg >/dev/null 2>&1; then
   if (cd "${PLUGIN_ROOT}" && rg -n --hidden --glob '!**/.git/**' --glob '!**/*.png' --glob '!scripts/check-public-plugin-content.sh' -e "${PATTERN}" "${SCAN_ROOTS[@]}"); then

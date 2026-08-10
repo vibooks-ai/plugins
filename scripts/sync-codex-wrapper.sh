@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CORE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 CODEX_ROOT="${CORE_ROOT}/codex/vibooks"
+CLAUDE_ROOT="${CORE_ROOT}/claude/vibooks"
 
 for dir in assets docs runtime skills; do
   source_dir="${CORE_ROOT}/${dir}"
@@ -17,4 +18,8 @@ for dir in assets docs runtime skills; do
   cp -R "${source_dir}" "${target_dir}"
 done
 
-echo "Synced Codex wrapper materialized copies from the portable Vibooks plugin core."
+for target_root in "${CODEX_ROOT}" "${CLAUDE_ROOT}"; do
+  cp "${CORE_ROOT}/LICENSE" "${target_root}/LICENSE"
+done
+
+echo "Synced platform wrapper copies from the portable Vibooks plugin core."

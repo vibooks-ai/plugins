@@ -7,9 +7,9 @@
 - Short description: AI bookkeeping from source documents to reconciled books
 - Developer: Block Software Inc.
 - Website: https://vibooks.ai/
-- Support: publish a dedicated https://vibooks.ai/support/ page before
-  submission; the current route renders the homepage fallback and is not a
-  valid support destination
+- Repository: https://github.com/vibooks-ai/plugins
+- License: Apache-2.0
+- Support: https://vibooks.ai/support/
 - Privacy: https://vibooks.ai/privacy/
 - Terms: https://vibooks.ai/terms/
 
@@ -32,6 +32,15 @@ Long description:
 Submit the first public OpenAI directory version as skills-only. The bundled
 local MCP server remains part of the repository-installed Codex plugin, but it
 is not a public production MCP endpoint for directory review.
+
+## Submission Prerequisites
+
+- Confirm https://vibooks.ai/agents/ renders the dedicated agent guide with its
+  own canonical URL instead of the homepage fallback.
+- Confirm https://vibooks.ai/support/ renders the dedicated support page with
+  its own canonical URL and a working private contact path.
+- Confirm the public repository and the submitted version tag are reachable
+  without authentication.
 
 ## Positive Test Cases
 

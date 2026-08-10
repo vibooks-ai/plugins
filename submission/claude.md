@@ -9,6 +9,9 @@
   reconciled books with Vibooks.
 - Developer: Block Software Inc.
 - Website: https://vibooks.ai/
+- Support: https://vibooks.ai/support/
+- Repository: https://github.com/vibooks-ai/plugins
+- License: Apache-2.0
 
 ## Public Skill Surface
 

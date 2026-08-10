@@ -5,14 +5,21 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const SERVER_NAME = "vibooks";
-const SERVER_VERSION = "0.2.0";
-const DEFAULT_PROTOCOL_VERSION = "2024-11-05";
+const DEFAULT_PROTOCOL_VERSION = "2025-11-25";
+const SUPPORTED_PROTOCOL_VERSIONS = new Set([
+  "2025-11-25",
+  "2025-06-18",
+  "2025-03-26",
+  "2024-11-05",
+]);
 const READ_ONLY_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const DEFAULT_DOWNLOADS_URL = "https://vibooks.ai/downloads.json";
 const DEFAULT_SKILL_MANIFEST_URL = "https://vibooks.ai/skills/manifest.json";
+const OFFICIAL_UPDATE_PATHS = new Set(["/downloads.json", "/skills/manifest.json"]);
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const SCRIPT_DIR = dirname(SCRIPT_PATH);
 const PLUGIN_ROOT = resolve(SCRIPT_DIR, "..");
+const SERVER_VERSION = await readInstalledPluginVersion();
 
 const jsonValueSchema = {
   anyOf: [
@@ -328,8 +335,11 @@ export async function handleRequest(message) {
 
   try {
     if (message.method === "initialize") {
+      const requestedProtocolVersion = message.params?.protocolVersion;
       return jsonRpcResult(message.id, {
-        protocolVersion: message.params?.protocolVersion ?? DEFAULT_PROTOCOL_VERSION,
+        protocolVersion: SUPPORTED_PROTOCOL_VERSIONS.has(requestedProtocolVersion)
+          ? requestedProtocolVersion
+          : DEFAULT_PROTOCOL_VERSION,
         capabilities: {
           tools: {
             listChanged: false,
@@ -377,33 +387,22 @@ export async function handleRequest(message) {
 }
 
 export function encodeMessage(message) {
-  const body = JSON.stringify(message);
-  const bodyBytes = Buffer.byteLength(body, "utf8");
-  return Buffer.from(`Content-Length: ${bodyBytes}\r\n\r\n${body}`, "utf8");
+  return Buffer.from(`${JSON.stringify(message)}\n`, "utf8");
 }
 
 export function extractMessages(buffer) {
   const messages = [];
   let offset = 0;
   while (offset < buffer.length) {
-    const headerEnd = findHeaderEnd(buffer, offset);
-    if (headerEnd < 0) {
+    const lineEnd = buffer.indexOf(0x0a, offset);
+    if (lineEnd < 0) {
       break;
     }
-    const header = buffer.subarray(offset, headerEnd.headerEnd).toString("utf8");
-    const match = /^content-length:\s*(\d+)\s*$/im.exec(header);
-    if (!match) {
-      throw new Error("MCP frame is missing Content-Length header.");
-    }
-    const contentLength = Number.parseInt(match[1], 10);
-    const bodyStart = headerEnd.bodyStart;
-    const bodyEnd = bodyStart + contentLength;
-    if (buffer.length < bodyEnd) {
-      break;
-    }
-    const rawBody = buffer.subarray(bodyStart, bodyEnd).toString("utf8");
-    messages.push(JSON.parse(rawBody));
-    offset = bodyEnd;
+    let rawLine = buffer.subarray(offset, lineEnd).toString("utf8");
+    if (rawLine.endsWith("\r")) rawLine = rawLine.slice(0, -1);
+    if (rawLine.length === 0) throw new Error("MCP stdio message must not be empty.");
+    messages.push(JSON.parse(rawLine));
+    offset = lineEnd + 1;
   }
   return { messages, rest: buffer.subarray(offset) };
 }
@@ -729,34 +728,53 @@ function skippedCatalog(url, label, reason) {
 
 async function loadJsonResource(rawUrl) {
   requireString(rawUrl, "manifest URL");
-  if (/^https?:\/\//i.test(rawUrl)) {
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      positiveInteger(process.env.VIBOOKS_MCP_UPDATE_FETCH_TIMEOUT_MS, 10_000),
-    );
-    try {
-      const response = await fetch(rawUrl, {
-        signal: controller.signal,
-        headers: {
-          accept: "application/json",
-          "user-agent": `VibooksMCP/${SERVER_VERSION}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} while fetching ${rawUrl}`);
-      }
-      return await response.json();
-    } finally {
-      clearTimeout(timeout);
+  const manifestUrl = validateOfficialUpdateUrl(rawUrl);
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    positiveInteger(process.env.VIBOOKS_MCP_UPDATE_FETCH_TIMEOUT_MS, 10_000),
+  );
+  try {
+    const response = await fetch(manifestUrl, {
+      signal: controller.signal,
+      redirect: "error",
+      headers: {
+        accept: "application/json",
+        "user-agent": `VibooksMCP/${SERVER_VERSION}`,
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} while fetching ${manifestUrl}`);
     }
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
   }
+}
 
-  if (process.env.VIBOOKS_MCP_ALLOW_FILE_UPDATE_MANIFESTS !== "1") {
-    throw new Error("Only https:// update manifests are allowed.");
+function validateOfficialUpdateUrl(rawUrl) {
+  let url;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new UserInputError("Update manifest URL must be a valid URL.");
   }
-  const text = await readFile(rawUrl, "utf8");
-  return JSON.parse(text);
+  const usesDefaultPort = url.port === "" || url.port === "443";
+  if (
+    url.protocol !== "https:" ||
+    url.hostname !== "vibooks.ai" ||
+    !usesDefaultPort ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    !OFFICIAL_UPDATE_PATHS.has(url.pathname)
+  ) {
+    throw new UserInputError(
+      "Update manifests must use an approved https://vibooks.ai manifest URL without credentials, query parameters, fragments, or redirects.",
+    );
+  }
+  return url.href;
 }
 
 async function detectCliVersion() {
@@ -1052,18 +1070,6 @@ function cappedConcat(current, chunk, maxBytes) {
   return next.length > maxBytes ? next.subarray(0, maxBytes) : next;
 }
 
-function findHeaderEnd(buffer, offset) {
-  const crlf = buffer.indexOf("\r\n\r\n", offset, "utf8");
-  const lf = buffer.indexOf("\n\n", offset, "utf8");
-  if (crlf >= 0 && (lf < 0 || crlf <= lf)) {
-    return { headerEnd: crlf, bodyStart: crlf + 4 };
-  }
-  if (lf >= 0) {
-    return { headerEnd: lf, bodyStart: lf + 2 };
-  }
-  return -1;
-}
-
 function jsonRpcResult(id, result) {
   return { jsonrpc: "2.0", id, result };
 }
@@ -1081,25 +1087,56 @@ function jsonRpcError(id, code, message) {
 
 export async function runStdioServer({ input = process.stdin, output = process.stdout } = {}) {
   let buffer = Buffer.alloc(0);
-  input.on("data", async (chunk) => {
-    buffer = Buffer.concat([buffer, chunk]);
-    let parsed;
-    try {
-      parsed = extractMessages(buffer);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      output.write(encodeMessage(jsonRpcError(null, -32700, message)));
-      buffer = Buffer.alloc(0);
-      return;
-    }
-    buffer = parsed.rest;
-    for (const message of parsed.messages) {
-      const response = await handleRequest(message);
-      if (response) {
-        output.write(encodeMessage(response));
+  const maxInputBytes = positiveInteger(process.env.VIBOOKS_MCP_MAX_INPUT_BYTES, 10_000_000);
+  let queue = Promise.resolve();
+
+  input.on("data", (chunk) => {
+    queue = queue.then(async () => {
+      if (buffer.length + chunk.length > maxInputBytes) {
+        output.write(
+          encodeMessage(jsonRpcError(null, -32700, `MCP input exceeded ${maxInputBytes} bytes.`)),
+        );
+        buffer = Buffer.alloc(0);
+        return;
       }
-    }
+
+      buffer = Buffer.concat([buffer, chunk]);
+      let parsed;
+      try {
+        parsed = extractMessages(buffer);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        output.write(encodeMessage(jsonRpcError(null, -32700, message)));
+        buffer = Buffer.alloc(0);
+        return;
+      }
+      buffer = parsed.rest;
+      for (const message of parsed.messages) {
+        const response = await handleRequest(message);
+        if (response) {
+          output.write(encodeMessage(response));
+        }
+      }
+    });
   });
+}
+
+async function readInstalledPluginVersion() {
+  for (const relativePath of [
+    "plugin.json",
+    ".codex-plugin/plugin.json",
+    ".claude-plugin/plugin.json",
+  ]) {
+    try {
+      const parsed = JSON.parse(await readFile(resolve(PLUGIN_ROOT, relativePath), "utf8"));
+      if (typeof parsed.version === "string" && parsed.version.trim() !== "") {
+        return parsed.version;
+      }
+    } catch {
+      // Try the next platform manifest.
+    }
+  }
+  return "0.0.0";
 }
 
 const entrypoint = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";

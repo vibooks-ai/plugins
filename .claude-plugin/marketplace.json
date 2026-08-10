@@ -14,8 +14,9 @@
         "name": "Block Software Inc.",
         "url": "https://vibooks.ai/"
       },
-      "homepage": "https://vibooks.ai/",
-      "license": "Proprietary",
+      "homepage": "https://vibooks.ai/agents/",
+      "repository": "https://github.com/vibooks-ai/plugins",
+      "license": "Apache-2.0",
       "category": "Finance",
       "keywords": [
         "vibooks",

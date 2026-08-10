@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { chmod, mkdtemp, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -21,11 +21,32 @@ test("lists Vibooks MCP tools", async () => {
   assert.equal(response.result.tools.some((tool) => tool.name === "vibooks_update_status"), true);
 });
 
-test("encodes and extracts JSON-RPC frames", () => {
-  const frame = encodeMessage({ jsonrpc: "2.0", id: 7, result: { ok: true } });
-  const parsed = extractMessages(frame);
+test("encodes and extracts newline-delimited MCP messages", () => {
+  const message = { jsonrpc: "2.0", id: 7, result: { ok: true } };
+  const encoded = encodeMessage(message);
+  assert.equal(encoded.toString("utf8"), `${JSON.stringify(message)}\n`);
+  assert.equal(encoded.toString("utf8").includes("Content-Length"), false);
+  const parsed = extractMessages(encoded);
   assert.deepEqual(parsed.messages, [{ jsonrpc: "2.0", id: 7, result: { ok: true } }]);
   assert.equal(parsed.rest.length, 0);
+});
+
+test("negotiates a supported legacy MCP protocol version", async () => {
+  const supported = await handleRequest({
+    jsonrpc: "2.0",
+    id: 70,
+    method: "initialize",
+    params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: {} },
+  });
+  assert.equal(supported.result.protocolVersion, "2024-11-05");
+
+  const fallback = await handleRequest({
+    jsonrpc: "2.0",
+    id: 71,
+    method: "initialize",
+    params: { protocolVersion: "unsupported-version", capabilities: {}, clientInfo: {} },
+  });
+  assert.equal(fallback.result.protocolVersion, "2025-11-25");
 });
 
 test("serves tool discovery through the packaged stdio entrypoint", async () => {
@@ -41,10 +62,31 @@ test("serves tool discovery through the packaged stdio entrypoint", async () => 
     stdio: ["pipe", "pipe", "pipe"],
   });
 
+  const initializePromise = readOneMessage(child);
+  child.stdin.write(
+    encodeMessage({
+      jsonrpc: "2.0",
+      id: 8,
+      method: "initialize",
+      params: {
+        protocolVersion: "2025-11-25",
+        capabilities: {},
+        clientInfo: { name: "vibooks-test", version: "1.0.0" },
+      },
+    }),
+  );
+  const initialize = await initializePromise;
+  const installedPluginVersion = await readInstalledPluginVersion(pluginRoot);
+  assert.equal(initialize.result.protocolVersion, "2025-11-25");
+  assert.equal(initialize.result.serverInfo.version, installedPluginVersion);
+
+  child.stdin.write(
+    encodeMessage({ jsonrpc: "2.0", method: "notifications/initialized", params: {} }),
+  );
   const responsePromise = readOneMessage(child);
-  child.stdin.write(encodeMessage({ jsonrpc: "2.0", id: 8, method: "tools/list" }));
+  child.stdin.write(encodeMessage({ jsonrpc: "2.0", id: 9, method: "tools/list" }));
   const response = await responsePromise;
-  assert.equal(response.id, 8);
+  assert.equal(response.id, 9);
   assert.equal(response.result.tools.some((tool) => tool.name === "vibooks_readiness"), true);
 
   const exited = once(child, "exit");
@@ -125,38 +167,36 @@ test("allows confirmed mutation invoke", async () => {
 });
 
 test("reports update status from downloads and skill manifests without updating", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "vibooks-mcp-update-test-"));
-  const downloadsPath = join(dir, "downloads.json");
-  const skillManifestPath = join(dir, "skill-manifest.json");
-  await writeFile(
-    downloadsPath,
-    JSON.stringify({
-      version: {
-        desktop: "1.2.6",
-        headless: "1.2.6",
-        cli: "1.1.1",
-      },
-    }),
-  );
-  await writeFile(
-    skillManifestPath,
-    JSON.stringify({
-      version: "1.1.1",
-      latest_version: "1.1.1",
-      minimum_recommended_version: "1.1.1",
-      critical_update: true,
-      update_all_command: "npx skills update",
-      update_scope: "all_installed_skills",
-      blocking_update_before: ["bookkeeping_mutation_when_critical_update_is_true"],
-    }),
-  );
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(options.redirect, "error");
+    assert.equal(options.headers.accept, "application/json");
+    const payload =
+      url === "https://vibooks.ai/downloads.json"
+        ? {
+            version: {
+              desktop: "1.2.6",
+              headless: "1.2.6",
+              cli: "1.1.1",
+            },
+          }
+        : {
+            version: "1.1.1",
+            latest_version: "1.1.1",
+            minimum_recommended_version: "1.1.1",
+            critical_update: true,
+            update_all_command: "npx skills update",
+            update_scope: "all_installed_skills",
+            blocking_update_before: ["bookkeeping_mutation_when_critical_update_is_true"],
+          };
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  };
 
-  const originalAllowFile = process.env.VIBOOKS_MCP_ALLOW_FILE_UPDATE_MANIFESTS;
-  process.env.VIBOOKS_MCP_ALLOW_FILE_UPDATE_MANIFESTS = "1";
   try {
     const response = await callTool("vibooks_update_status", {
-      downloadsUrl: downloadsPath,
-      skillManifestUrl: skillManifestPath,
       checkLocal: false,
       cliVersion: "1.0.0",
       desktopVersion: "1.2.5",
@@ -173,7 +213,32 @@ test("reports update status from downloads and skill manifests without updating"
     assert.equal(payload.update_policies.vibooks_skill.update_scope, "all_installed_skills");
     assert.match(payload.update_policies.vibooks_plugin.not_updated_by, /npx skills update/);
   } finally {
-    restoreEnv("VIBOOKS_MCP_ALLOW_FILE_UPDATE_MANIFESTS", originalAllowFile);
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("rejects non-official update manifest URLs before fetching", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    throw new Error("Unexpected network request");
+  };
+  try {
+    const response = await callTool("vibooks_update_status", {
+      downloadsUrl: "http://127.0.0.1:26170/private.json",
+      skillManifestUrl: "https://example.com/skill.json",
+      checkLocal: false,
+    });
+    assert.equal(response.result.isError, undefined);
+    const payload = JSON.parse(response.result.content[0].text);
+    assert.equal(payload.catalogs.downloads.ok, false);
+    assert.equal(payload.catalogs.skill_manifest.ok, false);
+    assert.match(payload.catalogs.downloads.error, /approved https:\/\/vibooks\.ai/);
+    assert.match(payload.catalogs.skill_manifest.error, /approved https:\/\/vibooks\.ai/);
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
 
@@ -230,39 +295,71 @@ function componentStatus(payload, name) {
   return payload.components.find((component) => component.component === name)?.status;
 }
 
+async function readInstalledPluginVersion(pluginRoot) {
+  const manifestPaths = [
+    "plugin.json",
+    join(".codex-plugin", "plugin.json"),
+    join(".claude-plugin", "plugin.json"),
+  ];
+  for (const manifestPath of manifestPaths) {
+    try {
+      const manifest = JSON.parse(await readFile(join(pluginRoot, manifestPath), "utf8"));
+      if (typeof manifest.version === "string" && manifest.version.length > 0) {
+        return manifest.version;
+      }
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+  }
+  throw new Error("Installed plugin manifest does not contain a version.");
+}
+
 function readOneMessage(child) {
   return new Promise((resolve, reject) => {
     let stdout = Buffer.alloc(0);
     let stderr = "";
     const timeout = setTimeout(() => {
+      cleanup();
       child.kill();
       reject(new Error(`Timed out waiting for MCP response. ${stderr}`.trim()));
     }, 5_000);
 
-    child.stderr.on("data", (chunk) => {
+    const onStderr = (chunk) => {
       stderr += chunk.toString("utf8");
-    });
-    child.once("error", (error) => {
+    };
+    const cleanup = () => {
       clearTimeout(timeout);
+      child.stderr.off("data", onStderr);
+      child.off("error", onError);
+      child.off("exit", onExit);
+      child.stdout.off("data", onStdout);
+    };
+    const onError = (error) => {
+      cleanup();
       reject(error);
-    });
-    child.once("exit", (code) => {
+    };
+    const onExit = (code) => {
       if (stdout.length === 0) {
-        clearTimeout(timeout);
+        cleanup();
         reject(new Error(`MCP server exited before responding with code ${code}. ${stderr}`.trim()));
       }
-    });
-    child.stdout.on("data", (chunk) => {
+    };
+    const onStdout = (chunk) => {
       stdout = Buffer.concat([stdout, chunk]);
       try {
         const parsed = extractMessages(stdout);
         if (parsed.messages.length === 0) return;
-        clearTimeout(timeout);
+        cleanup();
         resolve(parsed.messages[0]);
       } catch (error) {
-        clearTimeout(timeout);
+        cleanup();
         reject(error);
       }
-    });
+    };
+
+    child.stderr.on("data", onStderr);
+    child.once("error", onError);
+    child.once("exit", onExit);
+    child.stdout.on("data", onStdout);
   });
 }
