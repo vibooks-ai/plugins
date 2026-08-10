@@ -1,0 +1,25 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "vibooks",
+  "version": "0.3.0",
+  "description": "AI bookkeeping for small businesses, from source documents to reconciled books.",
+  "author": {
+    "name": "Block Software Inc.",
+    "url": "https://vibooks.ai/"
+  },
+  "homepage": "https://vibooks.ai/agents/",
+  "license": "Proprietary",
+  "keywords": [
+    "vibooks",
+    "bookkeeping",
+    "small-business",
+    "receipts",
+    "invoices",
+    "bills",
+    "bank-reconciliation",
+    "month-end",
+    "accounting",
+    "local-first",
+    "ai-agent"
+  ]
+}

@@ -1,8 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { chmod, mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 
 import { encodeMessage, extractMessages, handleRequest } from "./vibooks-mcp.mjs";
 
@@ -23,6 +26,30 @@ test("encodes and extracts JSON-RPC frames", () => {
   const parsed = extractMessages(frame);
   assert.deepEqual(parsed.messages, [{ jsonrpc: "2.0", id: 7, result: { ok: true } }]);
   assert.equal(parsed.rest.length, 0);
+});
+
+test("serves tool discovery through the packaged stdio entrypoint", async () => {
+  const pluginRoot = fileURLToPath(new URL("../", import.meta.url));
+  const pluginData = await mkdtemp(join(tmpdir(), "vibooks-plugin-data-"));
+  const entrypoint = fileURLToPath(new URL("./vibooks-mcp.mjs", import.meta.url));
+  const child = spawn(process.execPath, [entrypoint], {
+    env: {
+      ...process.env,
+      PLUGIN_ROOT: pluginRoot,
+      PLUGIN_DATA: pluginData,
+    },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+
+  const responsePromise = readOneMessage(child);
+  child.stdin.write(encodeMessage({ jsonrpc: "2.0", id: 8, method: "tools/list" }));
+  const response = await responsePromise;
+  assert.equal(response.id, 8);
+  assert.equal(response.result.tools.some((tool) => tool.name === "vibooks_readiness"), true);
+
+  const exited = once(child, "exit");
+  child.kill();
+  await exited;
 });
 
 test("runs readiness through configured vibooks-cli", async () => {
@@ -201,4 +228,41 @@ function restoreEnv(name, value) {
 
 function componentStatus(payload, name) {
   return payload.components.find((component) => component.component === name)?.status;
+}
+
+function readOneMessage(child) {
+  return new Promise((resolve, reject) => {
+    let stdout = Buffer.alloc(0);
+    let stderr = "";
+    const timeout = setTimeout(() => {
+      child.kill();
+      reject(new Error(`Timed out waiting for MCP response. ${stderr}`.trim()));
+    }, 5_000);
+
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString("utf8");
+    });
+    child.once("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.once("exit", (code) => {
+      if (stdout.length === 0) {
+        clearTimeout(timeout);
+        reject(new Error(`MCP server exited before responding with code ${code}. ${stderr}`.trim()));
+      }
+    });
+    child.stdout.on("data", (chunk) => {
+      stdout = Buffer.concat([stdout, chunk]);
+      try {
+        const parsed = extractMessages(stdout);
+        if (parsed.messages.length === 0) return;
+        clearTimeout(timeout);
+        resolve(parsed.messages[0]);
+      } catch (error) {
+        clearTimeout(timeout);
+        reject(error);
+      }
+    });
+  });
 }

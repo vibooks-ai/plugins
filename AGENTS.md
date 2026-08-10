@@ -1,23 +1,26 @@
 # Vibooks Agent Plugin Rules
 
-- This repository is shaped as a standalone Vibooks agent-plugin package: one shared core plus thin platform wrappers.
-- Keep shared public content in `plugins/shared/vibooks/`: Vibooks skills, MCP server, assets, and plugin docs. Keep platform-specific manifests and config in `plugins/codex/vibooks/` and `plugins/claude/vibooks/`.
+- This repository is shaped as a standalone Vibooks agent-plugin package: one portable Agent Plugins core plus thin platform wrappers.
+- The repository root is the portable Agent Plugins package. Keep its standard manifest in `plugin.json`, its standard MCP configuration in `mcp.json`, and shared public content in `skills/`, `runtime/`, `assets/`, and `docs/`. Keep platform-specific manifests and config in `codex/vibooks/` and `claude/vibooks/`.
+- Keep the portable package conformant with Agent Plugins 1.0.0. Its root `plugin.json` and `mcp.json` must use the canonical 1.0.0 schema identifiers, and `mcp.json` must not contain Codex- or Claude-specific fields.
 - Name installable plugins after the product, `vibooks`, rather than adding platform suffixes such as `-codex` or `-claude`. Keep platform-specific wording in descriptions, release-train names, or docs, not in the plugin id.
 - Keep the public marketplace id and display name product-owned as `vibooks` and `Vibooks`; do not publish the standalone repository under a generic local marketplace name such as `personal`.
 - Put Vibooks in the `Finance` category and lead public listing copy with bookkeeping outcomes such as source-document entry, reconciliation, review, and month end. Keep MCP, OpenAPI, schema, and CLI terminology in technical documentation rather than the listing's primary value proposition.
 - Expose task-oriented skills for setup, document bookkeeping, reconciliation and close, and independent review. MCP routing is implementation detail and must not be the main user-visible skill surface.
-- The Codex marketplace entry at `.agents/plugins/marketplace.json` must point to `./plugins/codex/vibooks`.
-- The Claude Code marketplace entry at `.claude-plugin/marketplace.json` must point to `./plugins/claude/vibooks`.
-- Wrapper directories should remain thin in ownership even when packaging requires materialized files. Keep `plugins/shared/vibooks/` as the editing source of truth. The Codex wrapper must carry materialized copies of shared assets, docs, scripts, and skills because Codex installs only the plugin source path and drops cross-directory links. The Claude wrapper may use relative links to `plugins/shared/vibooks/`, which Claude marketplace installs can dereference from the same repository.
-- The Codex plugin version lives in `plugins/codex/vibooks/.codex-plugin/plugin.json`.
-- The Claude Code plugin version lives in `plugins/claude/vibooks/.claude-plugin/plugin.json`.
+- The standalone Codex marketplace entry at `.agents/plugins/marketplace.json` must point to `./codex/vibooks`.
+- The standalone Claude Code marketplace entry at `.claude-plugin/marketplace.json` must point to `./claude/vibooks`.
+- Wrapper directories should remain thin in ownership even when packaging requires materialized files. Keep the repository-root portable package as the editing source of truth. The Codex wrapper must carry materialized copies of shared assets, docs, runtime, and skills because Codex installs only the plugin source path and drops cross-directory links. The Claude wrapper may use relative links that resolve inside this same public repository.
+- The portable Agent Plugin version lives in `plugin.json`.
+- The Codex plugin version lives in `codex/vibooks/.codex-plugin/plugin.json`.
+- The Claude Code plugin version lives in `claude/vibooks/.claude-plugin/plugin.json`.
+- The `agent-plugin` release train must keep all three version fields identical and publish one repository tag for the portable package and both wrappers.
 - Canonical plugin release tags use `vX.Y.Z` or `vX.Y.Z-rc.N`.
-- Bump the relevant wrapper version whenever plugin metadata, marketplace packaging, MCP tools, bundled assets, bundled skill content, or plugin-specific workflow instructions change. When shared core content changes, review whether both platform wrapper versions must be bumped.
-- Treat `plugins/shared/vibooks/skills/vibooks/` as a packaged public copy. Make durable workflow edits in the upstream Vibooks skill source first, then refresh this repo's public copy.
-- After editing shared public content inside this repo, run `plugins/scripts/sync-codex-wrapper.sh` so the Codex wrapper materialized copy stays in sync.
+- Bump the `agent-plugin` version across the portable manifest and both wrappers whenever plugin metadata, marketplace packaging, MCP tools, bundled assets, bundled skill content, or plugin-specific workflow instructions change.
+- Treat `skills/vibooks/` as a packaged public copy. Make durable workflow edits in the upstream Vibooks skill source first, then refresh this repo's public copy.
+- After editing portable public content inside this repo, run `scripts/sync-codex-wrapper.sh` so the Codex wrapper materialized copy stays in sync.
 - Do not ship canonical skill eval materials in the public plugin package. Files under `skills/vibooks/evals/` are useful in the canonical skill repo, can contain local machine paths or monorepo assumptions, and are intentionally removed by the sync script.
 - Public plugin files must not contain developer-machine absolute paths, local tokens, private screenshots, private release evidence, or workspace-only sibling paths.
-- Public plugin wrappers may link to `plugins/shared/vibooks/` inside the same public repo, but must not reference unpublished workspace-only siblings.
+- Public plugin wrappers may link to repository-root portable content, but every link must resolve inside this public repo and must not reference unpublished workspace-only siblings.
 - Plugin MCP tools must go through `vibooks-cli` or official Vibooks HTTP APIs only. Do not add direct database, runtime-file, or entitlement-bypass access to the plugin.
 - Keep write-capable tools opt-in and explicit. Mutation-capable MCP tools must require a confirmation parameter or equivalent agent approval boundary before calling non-read-only Vibooks operations.
-- Before calling a plugin release ready, run the current Codex plugin validator on `plugins/codex/vibooks`, run `plugins/scripts/check-public-plugin-content.sh`, run `node --test plugins/shared/vibooks/scripts/test-vibooks-mcp.mjs`, validate `plugins/claude/vibooks` with Claude Code when available, and verify the Codex wrapper materialized copies match `plugins/shared/vibooks/`.
+- Before calling a plugin release ready, validate root `plugin.json` and `mcp.json` against the vendored official Agent Plugins schemas, run the current Codex plugin validator on `codex/vibooks`, run `scripts/check-public-plugin-content.sh`, run `node --test runtime/test-vibooks-mcp.mjs`, validate `claude/vibooks` with Claude Code when available, and verify the Codex wrapper materialized copies match the repository-root portable core.

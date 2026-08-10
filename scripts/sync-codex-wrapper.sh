@@ -2,15 +2,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PUBLIC_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-SHARED_ROOT="${PUBLIC_ROOT}/plugins/shared/vibooks"
-CODEX_ROOT="${PUBLIC_ROOT}/plugins/codex/vibooks"
+CORE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+CODEX_ROOT="${CORE_ROOT}/codex/vibooks"
 
-for dir in assets docs scripts skills; do
-  source_dir="${SHARED_ROOT}/${dir}"
+for dir in assets docs runtime skills; do
+  source_dir="${CORE_ROOT}/${dir}"
   target_dir="${CODEX_ROOT}/${dir}"
   if [[ ! -d "${source_dir}" ]]; then
-    echo "Missing shared plugin directory: ${source_dir}" >&2
+    echo "Missing portable plugin core directory: ${source_dir}" >&2
     exit 1
   fi
   rm -rf "${target_dir}"
@@ -18,4 +17,4 @@ for dir in assets docs scripts skills; do
   cp -R "${source_dir}" "${target_dir}"
 done
 
-echo "Synced Codex wrapper materialized copies from shared Vibooks plugin core."
+echo "Synced Codex wrapper materialized copies from the portable Vibooks plugin core."

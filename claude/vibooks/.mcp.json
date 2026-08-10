@@ -3,7 +3,7 @@
     "vibooks": {
       "command": "node",
       "args": [
-        "${CLAUDE_PLUGIN_ROOT}/scripts/vibooks-mcp.mjs"
+        "${CLAUDE_PLUGIN_ROOT}/runtime/vibooks-mcp.mjs"
       ],
       "cwd": "${CLAUDE_PLUGIN_ROOT}"
     }

@@ -1,0 +1,35 @@
+{
+  "name": "vibooks",
+  "owner": {
+    "name": "Block Software Inc."
+  },
+  "description": "AI bookkeeping for small businesses, from source documents to reconciled books.",
+  "plugins": [
+    {
+      "name": "vibooks",
+      "displayName": "Vibooks",
+      "source": "./claude/vibooks",
+      "description": "Turn receipts, bills, invoices, and statements into reviewable, reconciled books with Vibooks.",
+      "author": {
+        "name": "Block Software Inc.",
+        "url": "https://vibooks.ai/"
+      },
+      "homepage": "https://vibooks.ai/",
+      "license": "Proprietary",
+      "category": "Finance",
+      "keywords": [
+        "vibooks",
+        "bookkeeping",
+        "small-business",
+        "receipts",
+        "invoices",
+        "bills",
+        "bank-reconciliation",
+        "month-end",
+        "accounting",
+        "local-first",
+        "ai-agent"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "vibooks-agent-plugin-maintenance",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "validate:agent-plugin": "node scripts/validate-agent-plugin.mjs"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0"
+  }
+}
