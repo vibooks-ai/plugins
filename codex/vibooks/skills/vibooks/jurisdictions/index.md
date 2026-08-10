@@ -16,8 +16,9 @@ without hardcoding those defaults into the core workflow.
 A jurisdiction profile is not the same thing as an industry preset.
 
 - jurisdiction profile: reporting-basis defaults, statutory tax posture,
-  chart-of-accounts guidance, control-account roles, numbering guidance, and
-  unit-of-measure guidance tied to a country or region
+  evidence-sufficiency rules, chart-of-accounts guidance, control-account
+  roles, numbering guidance, and unit-of-measure guidance tied to a country or
+  region
 - industry preset: workflow-specific account additions, dimensions, report
   views, and operating defaults tied to a business shape such as e-commerce,
   restaurant, or lodging
@@ -66,10 +67,10 @@ Rules:
   and keep tax-coded bookkeeping off until registration or filing requirements
   are clear
 - when the book's country or region is outside a documented profile, or when
-  the current profile does not clearly cover a material tax, reporting, or
-  measurement question, research the current official country rules before
-  creating tax codes, tax control accounts, or claiming local-compliance
-  support
+  the current profile does not clearly cover a material evidence, tax,
+  reporting, or measurement question, research the current official country
+  rules before creating tax codes, tax control accounts, accepting
+  statement-only support, or claiming local-compliance support
 - research sources in this order:
   1. government tax authority, law database, or regulator
   2. official accounting-standards body or professional-body guidance
@@ -91,8 +92,8 @@ country or region:
    only when the operator explicitly wants to opt in to those defaults, such
    as `post-v1-books-book-id-jurisdiction-profile-apply`
 4. choose the nearest official Vibooks industry preset when one clearly fits
-5. apply the jurisdiction profile's chart, tax, naming, numbering, and
-   measurement guidance
+5. apply the jurisdiction profile's evidence, chart, tax, naming, numbering,
+   and measurement guidance
 6. reuse existing accounts and tax codes when they already match the profile;
    do not create near-duplicate objects
 

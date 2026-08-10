@@ -49,6 +49,48 @@ Stop and ask before proceeding if the book appears to be for:
 - a specialized sector with external reporting requirements outside ordinary
   small-business bookkeeping
 
+## Evidence Sufficiency And Statement Rules
+
+For ordinary Canadian small-business books, treat bank and card statements as
+source records that support observable account movement and reconciliation.
+Keep them with the book, but do not treat a statement or cancelled cheque as
+blanket proof of the underlying business expense, income source, accounting
+classification, or GST/HST treatment.
+
+Rules:
+
+- for ordinary business income and expense support, retain the available sales
+  invoice, purchase invoice, receipt, agreement, contract, deposit slip,
+  cancelled cheque, or other voucher that establishes the source and nature of
+  the transaction; a bank statement may be one part of that evidence bundle
+- if a supplier did not provide a receipt, do not invent one; obtain and record
+  the supplier name and address, amount, payment date, and transaction details
+  in the expense record or journal as permitted by current CRA guidance, and
+  keep the missing-document limitation visible for review
+- for a GST/HST input tax credit, mark `tax_documentation_supported` as `pass`
+  only when the available invoice, receipt, agreement, or other prescribed
+  documentation contains the information required for the claim
+- an ordinary monthly credit-card statement that lacks the prescribed supplier
+  and tax information is not sufficient documentary evidence for a GST/HST
+  input tax credit; require a supporting receipt, invoice, or other qualifying
+  documentation before treating the claim as supported
+- do not apply that ordinary-statement rule to a documented exception merely by
+  analogy: if the registrant relies on the CRA procurement-card policy or
+  another documentary exemption, confirm and retain the current authorization,
+  required controls, qualifying transaction scope, and issuer-report fields
+  before treating the exception as supported
+- an owner or accountant explanation may help classify a transaction, but it
+  does not replace the documentary information required for a GST/HST claim
+- for cash-basis reporting where it is actually applicable, statement evidence
+  may support when an amount was paid or received; for ASPE or another
+  accrual-basis book, use the underlying supply, invoice, service, or delivery
+  evidence for recognition and cutoff instead of substituting the bank date
+
+If the source supports payment but not business nature, recognition date, or
+GST/HST entitlement, keep those checks `warning`, `fail`, `needs_user`, or
+`unknown` as appropriate rather than passing the item from statement evidence
+alone.
+
 ## Current-Product Routing
 
 On the current shipped product, use the official jurisdiction-profile path for
@@ -263,6 +305,14 @@ official product setup. The skill should then switch from manual guidance to:
   [CRA GIFI](https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/corporations/corporation-income-tax-return/completing-your-corporation-income-tax-t2-return/general-index-financial-information-gifi/preparing-your-financial-statements-using-gifi.html)
 - CRA GST/HST rates and place-of-supply rules:
   [CRA GST/HST rates](https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/charge-collect-place-supply.html)
+- CRA business-record and expense-documentation guidance:
+  [CRA business records](https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/sole-proprietorships-partnerships/business-records.html),
+  [CRA business expenses](https://www.canada.ca/en/revenue-agency/services/tax/businesses/small-businesses-self-employed-income/business-income-tax-reporting/business-expenses/what-business-expenses.html),
+  and
+  [current Input Tax Credit Information (GST/HST) Regulations](https://laws-lois.justice.gc.ca/eng/regulations/SOR-91-45/section-3.html),
+  [CRA input tax credits](https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/calculate-prepare-report/input-tax-credit.html),
+  and
+  [CRA procurement-card policy](https://www.canada.ca/en/revenue-agency/services/forms-publications/publications/notice199/procurement-cards-documentary-requirements-claiming-input-tax-credits.html)
 - Canadian reporting-framework overview:
   [BDC IFRS and Canadian GAAP overview](https://www.bdc.ca/en/articles-tools/entrepreneur-toolkit/templates-business-guides/glossary/international-financial-reporting-standards)
   and

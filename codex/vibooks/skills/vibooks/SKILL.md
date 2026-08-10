@@ -11,7 +11,7 @@ description: >
   AI-assisted Vibooks bookkeeping against original source evidence in a clean
   review workspace without reusing prior extraction artifacts.
 metadata:
-  skill_version: 1.1.1
+  skill_version: 1.1.2
   source_repo: vibooks-ai/skills
   update_check: https://vibooks.ai/skills/manifest.json
   install_command: npx skills add vibooks-ai/skills --skill vibooks -g
@@ -158,6 +158,12 @@ direct mutation of Vibooks storage.
   already exposes a reusable setup
 - treat statements and source files as evidence and import them when the
   workflow supports attachments
+- treat bank and card statements as evidence of observable account movement and
+  reconciliation; treat payment or receipt as supported only when the statement
+  contains the facts required for the payment method and jurisdiction, and do
+  not treat statement support by itself as proof of business purpose, accounting
+  classification, recognition period, deductibility, or commodity-tax
+  entitlement
 - when normal bookkeeping uses OCR, parsers, scripts, or model extraction to
   read a receipt, invoice, statement, or payout report, treat extracted values
   as candidates only; before presenting a proposal or posting, visually confirm
@@ -267,8 +273,10 @@ copies.
 - do not create AR or AP activity with generic journals when invoice, bill,
   receipt, payment, apply, or payroll workflows exist
 - do not use opening balances to import current-period activity
-- do not treat bank or card statement lines as the primary ledger workflow;
-  they are evidence that must reconcile to posted entries
+- do not treat bank or card statement lines as the primary ledger workflow or
+  as blanket proof of the underlying business and tax treatment; they are
+  evidence of account movement that must reconcile to properly supported posted
+  entries
 - do not hard-delete posted business documents; use the native correction
   workflow
 

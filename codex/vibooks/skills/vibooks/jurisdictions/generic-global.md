@@ -37,11 +37,19 @@ This profile is a safe fallback, not a claim that the book has no local rules.
   product
 - use account numbering only when the existing book already uses numbering or
   the user clearly wants numbered accounts
+- treat bank and card statements as evidence of observable account movement and
+  reconciliation, not by themselves as proof of business purpose, accounting
+  classification, recognition date, deductibility, or commodity-tax
+  entitlement
+- keep `payment_or_receipt_supported`, `business_nature_supported`,
+  `recognition_date_supported`, and `tax_documentation_supported` as separate
+  review conclusions; do not turn statement provenance into a blanket pass
 - if the book uses item quantities, keep one base unit plus explicit
   conversions rather than mixing freehand unit assumptions into document lines
 - when the country or region is not covered by a stronger documented profile,
-  research the current official country rules before creating tax codes, tax
-  control accounts, or presenting local-compliance guidance
+  research the current official country rules before accepting statement-only
+  evidence for a material conclusion, creating tax codes or tax control
+  accounts, or presenting local-compliance guidance
 - research sources in this order:
   1. government tax authority, law database, or regulator
   2. official accounting-standards body or professional-body guidance
@@ -55,6 +63,8 @@ This profile is a safe fallback, not a claim that the book has no local rules.
 - the book needs jurisdiction-specific filing, remittance, or return behavior
 - a local commodity-tax regime, withholding regime, or payroll remittance
   regime matters
+- statement-only or substitute evidence would affect a deduction, tax credit,
+  commodity-tax claim, or other local-compliance conclusion
 - the business has a local reporting basis that materially changes bookkeeping
   presentation or classification
 

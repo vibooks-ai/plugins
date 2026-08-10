@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "vibooks",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "AI bookkeeping for small businesses, from source documents to reconciled books.",
   "author": {
     "name": "Block Software Inc.",

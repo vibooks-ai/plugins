@@ -44,6 +44,17 @@ Rules:
 
 - ...
 
+## Evidence Sufficiency And Statement Rules
+
+- define what bank and card statements can establish in this jurisdiction
+- distinguish proof of payment or receipt from proof of business purpose,
+  accounting classification, recognition date, and tax entitlement
+- document any prescribed invoice, receipt, tax-document, or record fields
+- state how missing receipts or substitute records must be handled
+- distinguish cash-basis timing from accrual-basis recognition
+- cite the current official tax authority, law, regulator, or standards source
+- keep an item unresolved when the local rule or required evidence is unclear
+
 ## Current-Product Routing
 
 On the current shipped product, ...
@@ -112,5 +123,8 @@ the same profile id and prefer the official product setup.
   axes
 - use official government or standards-body sources first
 - use mainstream software docs only for UX alignment, not as legal authority
+- keep statement provenance separate from evidence sufficiency and never treat
+  proof of payment alone as blanket proof of the underlying business or tax
+  treatment
 - prefer role-based account semantics over cosmetic display-name purity
 - stop and ask whenever subnational tax differences materially change the setup

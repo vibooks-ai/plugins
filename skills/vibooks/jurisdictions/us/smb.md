@@ -61,6 +61,46 @@ Rules:
   accounting as a higher-risk area and stop to confirm the intended method if
   the workflow is not obvious
 
+## Evidence Sufficiency And Statement Rules
+
+For ordinary United States small-business books, treat a legible financial
+account statement as supporting evidence of payment only when it contains the
+payment-method-specific facts required by current IRS guidance. Do not treat
+proof that money moved as sufficient by itself to establish a deductible
+business expense or the full accounting treatment.
+
+Rules:
+
+- retain the available sales slips, paid bills, invoices, receipts, deposit
+  slips, cancelled checks, account statements, credit-card slips, contracts, or
+  other contemporaneous records that support the book and tax-return entries
+- for a check, require the statement to show the check number, amount, payee,
+  and date the financial institution posted the check amount
+- for an electronic funds transfer, require the amount transferred, payee, and
+  date the financial institution posted the transfer
+- for a credit-card payment, require the amount charged, payee, and transaction
+  date; preserve a separately shown posting date for matching and reconciliation
+- use those method-specific statement facts to support the payment conclusion;
+  separately require evidence that the cost was incurred and had the stated
+  business purpose before passing `business_nature_supported`
+- do not mark a deduction or tax conclusion supported merely because a
+  statement shows the amount, payee, and date; IRS guidance explicitly treats
+  proof of payment alone as insufficient to establish entitlement to a
+  deduction
+- bank-originated fees or interest and clearly evidenced transfers between the
+  book's own accounts may rely primarily on statement evidence when the full
+  accounting treatment is apparent and no other applicable rule requires more
+- for cash-basis books, statement evidence may support when an amount was paid
+  or received; for accrual-basis books, use the underlying invoice, supply,
+  service, delivery, or obligation evidence for recognition and cutoff
+- federal income-tax recordkeeping does not resolve state or local sales-tax,
+  use-tax, or regulated-industry evidence requirements; research the applicable
+  authority when those rules affect the conclusion
+
+If the statement supports payment but the business purpose, recognition date,
+or applicable tax documentation remains unclear, keep the affected check
+`warning`, `fail`, `needs_user`, or `unknown` rather than passing the item.
+
 ## Current-Product Routing
 
 On the current shipped product, the United States is not yet a first-class

@@ -4,6 +4,19 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-08-10
+
+- Refresh the bundled Vibooks skill with jurisdiction-sensitive statement-
+  evidence guidance for Canada, the United States, and uncovered countries.
+- Treat bank and card statements as evidence of observable account movement and
+  reconciliation without using them as blanket support for business purpose,
+  recognition timing, deductions, or commodity-tax claims.
+- Separate payment or receipt support, business-nature support, recognition-date
+  support, and jurisdictional tax-documentation support in evidence reviews.
+- Distinguish per-line transaction and posting dates from statement closing
+  dates, and preserve unresolved genuine movements without guessing their
+  classification or tax treatment.
+
 ## [0.3.1] - 2026-08-10
 
 - Use newline-delimited JSON-RPC for standards-compliant MCP stdio transport.
@@ -16,6 +29,7 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 - Package Codex and Claude Code wrappers from the shared Vibooks workflows.
 - Add local MCP tools for readiness, discovery, controlled writes, review, and update status.
 
-[Unreleased]: https://github.com/vibooks-ai/plugins/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/vibooks-ai/plugins/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/vibooks-ai/plugins/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/vibooks-ai/plugins/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/vibooks-ai/plugins/releases/tag/v0.3.0

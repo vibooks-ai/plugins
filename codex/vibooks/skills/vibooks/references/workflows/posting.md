@@ -247,7 +247,11 @@ Use the correct field for the correct date:
 - `receipt_date`: when cash was received
 - `payment_date`: when cash left the funding account
 - `deposit_date`: when already-held funds were deposited into the bank account
-- `statement_date`: the date on a bank or card statement line
+- `statement_date`: the per-line date Vibooks uses for statement matching and
+  reconciliation; use the financial institution's posting or clearing date
+  when both transaction and posting dates are shown, retain the transaction
+  date in the original evidence and the bank-line `reference` or `note`, and
+  never use the statement period-end or closing date
 - `application_date`: when a receipt or payment is applied to AR or AP
 - `action_date`: the accounting date for cancellation or void workflows on
   posted source documents
@@ -265,7 +269,8 @@ Posting rules:
 - receipt or payment: use the actual settlement date
 - bank deposit: use the date the deposit hits the bank account
 - bank fee, transfer, owner contribution, loan funding, loan repayment: use the
-  bank settlement or statement date
+  evidence-supported transaction and posting dates under the payment method and
+  book policy; do not use the statement period-end or closing date
 - accrual or month-end adjustment: use the last day of the affected period
 - opening balances: use one verified cutover date
 

@@ -7,6 +7,7 @@
 - Accounting-standard boundary
 - Isolation rules
 - Inputs
+- Statement-evidence boundary
 - Prohibited reuse
 - Allowed tools
 - Extraction independence
@@ -136,6 +137,74 @@ Use these as primary or comparison inputs:
 Treat Vibooks bookkeeping results as the object under review. Do not treat
 them as source evidence.
 
+## Statement-Evidence Boundary
+
+Bank, debit-card, and credit-card statements are external evidence of the
+observable account movement they report. Subject to authenticity and
+readability, they can support the statement account, amount, displayed payee or
+memo, the per-line transaction and posting dates actually shown, and the
+account balance used for reconciliation. Keep transaction date, posting date,
+and statement period-end as separate source facts when the statement provides
+them.
+
+Statement evidence does not, by itself, establish:
+
+- what goods or services were supplied or why the activity was business-related
+- the complete legal identity or role of the underlying counterparty
+- whether the activity is revenue, expense, asset, liability, loan, transfer,
+  owner activity, refund, prepayment, or another accounting treatment
+- the recognition or cutoff date when the book uses accrual accounting
+- deductibility, commodity-tax entitlement, tax rate, tax amount, or the
+  statutory documentary information required by the jurisdiction
+
+For transaction-like records, evaluate these evidence conclusions separately:
+
+- `payment_or_receipt_supported`: payment or receipt, amount, and applicable
+  date are supported under the payment method and jurisdiction profile; do not
+  pass this conclusion merely because account movement is visible
+- `business_nature_supported`: the underlying business purpose and accounting
+  treatment are supported
+- `recognition_date_supported`: the date used under the book's accounting basis
+  is supported
+- `tax_documentation_supported`: the evidence meets the applicable
+  jurisdiction's documentary requirements for the claimed tax treatment
+
+`statement_supported` is a provenance label, not an item-level sufficiency or
+pass status. Do not mark an item `pass` merely because a statement proves that
+money moved. A bank-originated item such as an account fee or interest, or a
+clearly evidenced transfer between the book's own accounts, may rely primarily
+on statement evidence when that evidence establishes the full treatment and
+the jurisdiction profile does not require something more.
+
+For matching and reconciliation, Vibooks stores one per-line `statement_date`.
+When the source shows both transaction and posting dates, use the financial
+institution's posting or clearing date as `statement_date` and retain the
+transaction date in the original statement plus the line `reference` or `note`.
+If the source provides only one per-line date, record that date and identify its
+type as known or unknown; never silently relabel it. This storage choice does
+not decide the bookkeeping recognition date.
+
+For cash-basis books, select the payment or receipt date under the book policy,
+payment method, and jurisdiction rules. That may be a retained transaction date
+rather than Vibooks' matching-oriented `statement_date`. The statement
+period-end or closing date is not the line's payment or receipt date and must
+not be used merely because the line appears on that statement. For
+accrual-basis books, do not substitute the settlement, transaction, or posting
+date for the invoice, supply, service, delivery, or other recognition date.
+
+An owner or accountant explanation may support bookkeeping classification or
+resolve why another document is unavailable. It does not replace an invoice,
+receipt, prescribed tax document, or other source record when the jurisdiction
+requires one. Mark the affected evidence conclusion `warning`, `fail`,
+`needs_user`, or `unknown` as appropriate, and do not claim a deduction or
+commodity-tax entitlement that the available evidence cannot support.
+
+Use the book's jurisdiction profile to decide documentary sufficiency. When a
+material local evidence rule is not documented, research the current official
+tax authority, law, or standards guidance before concluding. Until the rule is
+confirmed, use `needs_user` or `unknown` rather than presenting the item as
+locally compliant.
+
 ## Prohibited Reuse
 
 Do not use local tools or artifacts that may repeat the bookkeeping agent's
@@ -195,12 +264,17 @@ visually against the original evidence or mark the check `unknown` or
 `needs_user`. Do not pass a record only because a new script's OCR or parser
 output matches Vibooks.
 
-Record field provenance when script assistance is used:
+Record field provenance whenever source facts support a conclusion, whether the
+source was inspected visually or with script assistance. In particular, record
+`statement_supported` whenever original statement facts support a conclusion;
+do not make this provenance conditional on OCR or parser use.
 
 - `visual_confirmed`: value was visually confirmed from original evidence
 - `script_candidate_only`: value came from script output and was not confirmed
 - `ledger_only`: value exists only in Vibooks and lacks source confirmation
-- `statement_supported`: value is supported by original statement evidence
+- `statement_supported`: an observable account-movement value is supported by
+  original statement evidence; this is provenance, not a sufficiency or pass
+  conclusion
 - `owner_or_accountant_explained`: value is supported by documented
   explanation rather than a source document
 
@@ -296,10 +370,12 @@ Check close readiness:
 Apply these criteria before calling work reviewed:
 
 - source evidence priority: original documents and statements outrank ledger
-  guesses, AI reasoning, and historical defaults
+  guesses, AI reasoning, and historical defaults, but each source supports only
+  the facts it actually contains
 - completeness: all source activity in scope is accounted for or explained
 - existence: every posted activity in scope has real source support or an
-  owner-confirmed explanation
+  owner-confirmed explanation, while any unmet jurisdictional document
+  requirement remains an explicit exception
 - amount accuracy: totals, splits, currency, fees, discounts, refunds, and
   partial settlements are consistent
 - tax accuracy: statutory tax lines, zero-rated, exempt, out-of-scope, included
@@ -310,8 +386,8 @@ Apply these criteria before calling work reviewed:
   refunds, deposits, and prepayments as ordinary income or expense
 - counterparty accuracy: bank memos, document names, aliases, and historical
   matches support the selected customer or vendor
-- cutoff: document dates, payment dates, statement dates, posting dates, and
-  period boundaries are not interchanged
+- cutoff: document dates, payment dates, per-line statement transaction or
+  posting dates, and period boundaries are not interchanged
 - consistency: similar activity is treated consistently unless source evidence
   explains the difference
 - reconciliation: statement-backed accounts tie to statement evidence
@@ -338,7 +414,8 @@ For each required check, include:
 
 - status
 - evidence reviewed
-- field provenance, when source fields were extracted
+- field provenance for material source values, including `statement_supported`
+  whenever original statement facts support a conclusion
 - reason for `warning`, `fail`, `needs_user`, `unknown`, or `not_applicable`
 - recommended action, or `none`
 
@@ -370,13 +447,18 @@ scoped item, show:
 - final status
 - source evidence reviewed
 - required checks and their conclusions
-- field provenance for extracted source values when script assistance was used
+- field provenance for material source values, including `statement_supported`
+  whenever original statement facts support a conclusion
 - any mismatch, uncertainty, or missing evidence
 - recommended action or `none`
 
 For transaction-like records, include required checks such as:
 
 - evidence present and readable
+- payment or receipt supported
+- business nature supported
+- recognition date supported under the book's accounting basis
+- jurisdictional tax documentation supported or explicitly unresolved
 - source date matches or is explained
 - counterparty matches or is explained
 - subtotal, tax, adjustments, and total match or are explained
@@ -392,6 +474,11 @@ For bank or card statement lines, include required checks such as:
 - amount and sign match the statement account type
 - transfer, card payment, fee, refund, loan, or owner activity treatment
 - linked source document or explanation
+- whether the statement supports only account movement or also supports the
+  underlying treatment under the jurisdiction profile
+
+Do not treat a documented explanation as a substitute for a locally required
+invoice, receipt, prescribed tax document, or other source record.
 
 For correction, application, reversal, opening-balance, and generated entries,
 include traceability checks instead of forcing receipt-style checks:
@@ -500,6 +587,9 @@ An independent evidence review is complete only when:
 - every `unknown` and `not_applicable` check has a reason
 - material script-extracted source fields are visually confirmed or clearly
   labeled as unconfirmed candidate values
+- statement-supported transaction-like items separately conclude payment or
+  receipt support, business nature, recognition date, and jurisdictional tax
+  documentation; no item passes from account-movement evidence alone
 - the coverage totals add up to the declared scope denominator
 - exceptions include source evidence, ledger comparison, severity,
   recommendation, and confirmation requirement

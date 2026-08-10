@@ -286,34 +286,63 @@ Rules:
 
 - statement lines are statement evidence, not the primary business-document
   posting workflow
+- statement evidence supports the observable account movement, amount, the
+  transaction and posting dates actually shown for the individual line,
+  displayed payee or memo, and reconciliation; it does not by itself prove the
+  underlying business purpose, accounting classification, recognition period,
+  deductibility, or commodity-tax entitlement
 - create one `bank-line` per real statement line; do not collapse multiple
   lines into one net amount unless the source statement itself shows a single
   netted line
 - record the line against the correct statement-backed account, with the real
-  statement date, signed amount, and meaningful payee or memo text from the
-  source statement
+  signed amount and meaningful payee or memo text from the source statement
+- use the financial institution's per-line posting or clearing date as Vibooks'
+  `statement_date` when the source shows both transaction and posting dates;
+  retain the transaction date in the original evidence and the bank-line
+  `reference` or `note`, and never substitute the statement period-end or
+  closing date
+- if the source shows only one per-line date, use it as `statement_date` and
+  identify whether it is a transaction date, posting date, or unknown rather
+  than silently relabeling it
 - bank and debit accounts normally treat a positive statement line as an asset
   increase; credit-card liability accounts normally treat a positive statement
   line as a liability increase
 - when matching, require the same statement account, the same source currency,
   and no duplicate reuse of an entry that is already matched to another
   statement line for the same account
-- Vibooks may match within a controlled timing window around the statement date
+- Vibooks may match within a controlled timing window around `statement_date`;
+  matching does not make that field the transaction's recognition date
 - one statement line may match multiple posted entries when their net movement
   on the statement account equals the signed statement amount
-- when a statement line reveals a missing transaction, create the formal posted
-  receipt, payment, or journal entry from the bank-line workflow and let
-  Vibooks auto-match it
+- when a statement line reveals a missing transaction and the full treatment is
+  supported, create the appropriate formal posted receipt, payment, or journal
+  entry from the bank-line workflow and let Vibooks auto-match it
+- when the account movement is genuine but the offset classification or tax
+  treatment is unresolved, do not invent revenue, expense, or tax: with
+  explicit owner or accountant approval, use the bank-line create-entry flow to
+  record the supported statement-account movement against a dedicated suspense
+  or clearing balance, claim no tax, retain the source-date facts and review
+  note, and auto-match the line; keep the business-nature, recognition-date, and
+  tax-documentation checks unresolved until the suspense balance is
+  reclassified through the normal correction or adjusting workflow
+- use the temporary suspense path only when the statement-account date and
+  movement are themselves supported; if they are not, or approval is absent,
+  leave the line `unmatched` so reconciliation and period close remain blocked;
+  do not convert a genuine unrecorded movement to `reviewed_exception`
 - use reviewed exceptions only for lines that are explained and documented but
   cannot yet be formally matched
+- when statement evidence proves only that money moved, keep the business
+  nature, recognition date, and tax-documentation checks unresolved instead of
+  inventing them from the bank memo
 
 ### Bank And Debit Accounts
 
 1. map each real account to its own bank or cash asset account
 2. import or create statement lines
 3. match statement lines to posted entries, match them to multiple posted
-   entries when the net movement ties, or create the missing posted transaction
-   directly from the statement line and auto-match it
+   entries when the net movement ties, create a fully supported missing posted
+   transaction, or—with explicit approval—record a genuine but unclassified
+   movement against suspense without a tax claim; then auto-match it
 4. ignore unmatched lines only with a reason
 5. create a reconciliation snapshot
 6. treat reconciliation as complete only when unmatched items and unexplained
@@ -406,7 +435,9 @@ The job is complete only when:
 - owner-provided source documents are imported into Vibooks evidence storage and
   linked with `attachment_ids` where the workflow supports it
 - every material entry has evidence or an explicit owner-confirmed explanation
-  for why no source document exists
+  for why no source document exists, and any unmet jurisdictional documentary
+  requirement remains an explicit exception rather than being cleared by that
+  explanation alone
 - accounts and dates follow accounting logic
 - bank balances tie to statements
 - credit-card liabilities tie to statements
