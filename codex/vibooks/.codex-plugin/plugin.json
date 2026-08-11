@@ -1,6 +1,6 @@
 {
   "name": "vibooks",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Bookkeeping software for AI agents, from source documents to reconciled books.",
   "author": {
     "name": "Block Software Inc.",
@@ -43,7 +43,7 @@
       "Reconcile my bank and card statements and prepare a month-end review."
     ],
     "brandColor": "#6D28D9",
-    "composerIcon": "./assets/composer-icon.png",
+    "composerIcon": "./assets/logo.png",
     "logo": "./assets/logo.png",
     "screenshots": [
       "./assets/overview-hero.png",

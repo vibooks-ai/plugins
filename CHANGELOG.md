@@ -4,6 +4,15 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-08-11
+
+- Add a repeatable OpenAI skills-only package build instead of relying on a
+  hand-modified marketplace ZIP.
+- Omit unsupported MCP and screenshot configuration from OpenAI ZIP uploads
+  while preserving the full repository-installed Codex plugin.
+- Use the upload-safe product logo for the composer icon and include supported
+  OpenAI interface metadata for every bundled skill.
+
 ## [0.3.3] - 2026-08-11
 
 - Distinguish plugin mode from standalone skill installation and updates.
@@ -39,7 +48,8 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 - Package Codex and Claude Code wrappers from the shared Vibooks workflows.
 - Add local MCP tools for readiness, discovery, controlled writes, review, and update status.
 
-[Unreleased]: https://github.com/vibooks-ai/plugins/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/vibooks-ai/plugins/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/vibooks-ai/plugins/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/vibooks-ai/plugins/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/vibooks-ai/plugins/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/vibooks-ai/plugins/compare/v0.3.0...v0.3.1

@@ -35,6 +35,17 @@ Submit the first public OpenAI directory version as skills-only. The bundled
 local MCP server remains part of the repository-installed Codex plugin, but it
 is not a public production MCP endpoint for directory review.
 
+Build the upload from the repository root:
+
+```bash
+npm run package:openai
+```
+
+Upload `dist/vibooks-openai-<version>.zip`. The generated package removes the
+local MCP declaration and screenshots from the Codex manifest, uses the
+upload-safe product logo, and overlays OpenAI skill interface metadata. Do not
+assemble or modify the ZIP by hand.
+
 ## Submission Prerequisites
 
 - Confirm https://vibooks.ai/agents/ renders the dedicated agent guide with its

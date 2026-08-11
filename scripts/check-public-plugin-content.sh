@@ -132,6 +132,12 @@ if [[ "$(jq -r '.plugins[0].category' "${PLUGIN_ROOT}/.agents/plugins/marketplac
   exit 1
 fi
 
+if [[ "$(jq -r '.interface.composerIcon' "${CODEX_ROOT}/.codex-plugin/plugin.json")" != "./assets/logo.png" ]]; then
+  echo "Codex marketplace packages must use the upload-safe product logo as the composer icon." >&2
+  exit 1
+fi
+node "${SCRIPT_DIR}/check-png-dimensions.mjs" "${CODEX_ROOT}/assets/logo.png" 48 48
+
 TASK_SKILLS=(setup bookkeep-documents reconcile-close review-books)
 for skill in "${TASK_SKILLS[@]}"; do
   if [[ ! -f "${PLUGIN_ROOT}/skills/${skill}/SKILL.md" ]]; then
@@ -140,6 +146,14 @@ for skill in "${TASK_SKILLS[@]}"; do
   fi
   if ! grep -q 'The plugin already provides the bundled Vibooks workflow' "${PLUGIN_ROOT}/skills/${skill}/SKILL.md"; then
     echo "Plugin task skill must prevent duplicate standalone skill installation: ${skill}" >&2
+    exit 1
+  fi
+done
+
+OPENAI_SKILLS=(vibooks "${TASK_SKILLS[@]}")
+for skill in "${OPENAI_SKILLS[@]}"; do
+  if [[ ! -f "${PLUGIN_ROOT}/submission/openai/skills/${skill}/agents/openai.yaml" ]]; then
+    echo "Missing OpenAI skills-only interface metadata: ${skill}" >&2
     exit 1
   fi
 done

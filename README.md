@@ -98,6 +98,10 @@ Then run the complete portable check:
 npm run check
 ```
 
+`npm run check` also builds the OpenAI directory's skills-only upload at
+`dist/vibooks-openai-<version>.zip`. That package intentionally omits the local
+MCP server and screenshots because ZIP uploads currently accept skills only.
+
 When the platform CLIs are available, also run:
 
 ```bash
