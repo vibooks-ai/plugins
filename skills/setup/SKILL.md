@@ -12,6 +12,10 @@ description: >
 Follow the bundled `vibooks` skill for installation, authentication,
 licensing, jurisdiction, and bookkeeping safety rules.
 
+The plugin already provides the bundled Vibooks workflow. Do not install a
+duplicate standalone skill with `npx skills`; use the agent client's plugin
+manager for plugin updates.
+
 1. Check product, CLI, skill, and plugin freshness with
    `vibooks_update_status` when that tool is available. Report updates; do not
    install them silently.

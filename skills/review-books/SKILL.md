@@ -13,6 +13,10 @@ description: >
 Follow the bundled `vibooks` skill's independent evidence-review workflow and
 professional bookkeeping criteria.
 
+The plugin already provides the bundled Vibooks workflow. Do not install a
+duplicate standalone skill with `npx skills`; use the agent client's plugin
+manager for plugin updates.
+
 1. Keep the review read-only. Do not pass `confirmMutation: true` and do not
    alter the Vibooks book during this skill.
 2. Work from original source documents and read-only Vibooks state in a clean

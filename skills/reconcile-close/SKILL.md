@@ -12,6 +12,10 @@ description: >
 Follow the bundled `vibooks` skill for reconciliation, period controls,
 corrections, source evidence, and professional bookkeeping rules.
 
+The plugin already provides the bundled Vibooks workflow. Do not install a
+duplicate standalone skill with `npx skills`; use the agent client's plugin
+manager for plugin updates.
+
 1. Confirm the company, book, statement account, statement dates, ending
    balance, and period under review. Never invent missing statement facts.
 2. Run `vibooks_readiness` and use `vibooks_verify` for the initial read-only

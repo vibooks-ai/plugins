@@ -11,7 +11,7 @@ description: >
   AI-assisted Vibooks bookkeeping against original source evidence in a clean
   review workspace without reusing prior extraction artifacts.
 metadata:
-  skill_version: 1.1.2
+  skill_version: 1.1.3
   source_repo: vibooks-ai/skills
   update_check: https://vibooks.ai/skills/manifest.json
   install_command: npx skills add vibooks-ai/skills --skill vibooks -g
@@ -30,10 +30,31 @@ Use this skill when the user needs Vibooks installed or reused locally, needs
 an agent connected safely to Vibooks, or wants real bookkeeping work done
 inside Vibooks.
 
+## Choose The Skill Distribution
+
+When this skill is loaded from the official Vibooks plugin, including through
+a namespaced skill such as `vibooks:setup` or `vibooks:bookkeep-documents`, the
+plugin already provides the bundled Vibooks workflow. Treat the skill as
+installed in plugin mode. Do not install or update a duplicate standalone copy
+with `npx skills add`, `npx skills check`, or `npx skills update` merely because
+an unnamespaced global `vibooks` skill is absent.
+
+Install and update the plugin through the current agent client's plugin
+directory or marketplace. After a plugin install or update, start a new task or
+restart the client when required so it loads the new bundled content. The
+plugin package version and `metadata.skill_version` are separate: the former
+identifies the published plugin release, while the latter identifies the
+bundled core workflow.
+
+Use the standalone installation and update commands below only when the
+official plugin is not loaded and the client supports the `skills` CLI
+ecosystem, or when the user explicitly requests a standalone installation.
+
 ## Install This Skill
 
-For agents that support the `skills` CLI ecosystem, install Vibooks from the
-public skill source repo:
+This section applies to standalone or direct-read web use, not plugin mode. For
+agents that support the `skills` CLI ecosystem and have not loaded the official
+Vibooks plugin, install Vibooks from the public skill source repo:
 
 ```bash
 npx skills add vibooks-ai/skills --skill vibooks -g
@@ -73,6 +94,16 @@ blocked or unavailable in the current client.
 
 Treat `metadata.skill_version` as the installed skill version. The latest public
 version is published at `metadata.update_check`.
+
+In plugin mode, use `vibooks_update_status` when available and the current
+client's plugin manager to check or install a plugin update. Report an available
+update, but do not silently install it and do not use the standalone
+`metadata.install_command` or `metadata.update_all_command`. If the bundled core
+workflow is behind a critical public update and the next action is a high-risk
+write, stop for confirmation and use `metadata.web_fallback` for current
+instructions until the plugin has been refreshed.
+
+The standalone refresh flow below applies only outside plugin mode.
 
 Check for skill updates at these times:
 
@@ -265,7 +296,9 @@ copies.
 - do not invent tokens, bootstrap secrets, counterparties, dates, tax
   treatment, statement details, or opening balances
 - do not keep using the direct-read web copy as the normal long-term mode when
-  the client can install and reuse the local `vibooks` skill
+  the client can install and reuse the official plugin or local `vibooks` skill
+- do not install a duplicate standalone `vibooks` skill when the official
+  Vibooks plugin already provides the bundled workflow
 - do not imply that `npx skills update` refreshes only `vibooks`; it updates
   all installed skills
 - do not treat a healthy localhost process as reusable until it is confirmed to

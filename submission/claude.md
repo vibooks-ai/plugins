@@ -5,8 +5,8 @@
 - Name: Vibooks
 - Marketplace: vibooks
 - Category: Finance
-- Description: Turn receipts, bills, invoices, and statements into reviewable,
-  reconciled books with Vibooks.
+- Description: Turn source documents into reviewable, reconciled books with
+  Vibooks software.
 - Developer: Block Software Inc.
 - Website: https://vibooks.ai/
 - Support: https://vibooks.ai/support/

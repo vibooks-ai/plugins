@@ -4,7 +4,8 @@
 
 - Name: Vibooks
 - Category: Finance
-- Short description: AI bookkeeping from source documents to reconciled books
+- Short description: Turn source documents into reviewable, reconciled books
+  with Vibooks software
 - Developer: Block Software Inc.
 - Website: https://vibooks.ai/
 - Repository: https://github.com/vibooks-ai/plugins
@@ -15,11 +16,12 @@
 
 Long description:
 
-> Turn receipts, bills, invoices, and bank or card statements into
-> source-linked bookkeeping in Vibooks. Set up books, record transactions
-> through proper workflows, reconcile accounts, review exceptions, and prepare
-> month-end reports with your own AI agent. Books stay on your device by
-> default, and writes remain controlled and reviewable.
+> Use your AI agent with Vibooks, professional bookkeeping software for small
+> businesses and bookkeeping firms. Turn receipts, bills, invoices, and bank or
+> card statements into source-linked, reviewable records. Record transactions
+> through proper workflows, reconcile accounts, independently review entries,
+> and prepare for month end. Books stay on your device by default, and every
+> write remains user-controlled.
 
 ## Starter Prompts
 

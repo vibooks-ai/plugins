@@ -66,6 +66,25 @@ if [[ "$(jq -r '.version' "${CODEX_ROOT}/.codex-plugin/plugin.json")" != "${PORT
   exit 1
 fi
 
+CANONICAL_DESCRIPTION="Bookkeeping software for AI agents, from source documents to reconciled books."
+MARKETPLACE_DESCRIPTION="Turn source documents into reviewable, reconciled books with Vibooks software."
+for manifest in \
+  "${PLUGIN_ROOT}/plugin.json" \
+  "${CODEX_ROOT}/.codex-plugin/plugin.json" \
+  "${PLUGIN_ROOT}/claude/vibooks/.claude-plugin/plugin.json"; do
+  if [[ "$(jq -r '.description' "${manifest}")" != "${CANONICAL_DESCRIPTION}" ]]; then
+    echo "Plugin manifests must use the canonical marketplace description: ${manifest}" >&2
+    exit 1
+  fi
+done
+
+if [[ "$(jq -r '.description' "${PLUGIN_ROOT}/.claude-plugin/marketplace.json")" != "${CANONICAL_DESCRIPTION}" ]] ||
+   [[ "$(jq -r '.plugins[0].description' "${PLUGIN_ROOT}/.claude-plugin/marketplace.json")" != "${MARKETPLACE_DESCRIPTION}" ]] ||
+   [[ "$(jq -r '.interface.shortDescription' "${CODEX_ROOT}/.codex-plugin/plugin.json")" != "${MARKETPLACE_DESCRIPTION%.}" ]]; then
+  echo "Platform marketplace descriptions must use the outcome-led listing copy." >&2
+  exit 1
+fi
+
 REPOSITORY_URL="https://github.com/vibooks-ai/plugins"
 HOMEPAGE_URL="https://vibooks.ai/agents/"
 for manifest in \
@@ -119,7 +138,16 @@ for skill in "${TASK_SKILLS[@]}"; do
     echo "Missing task-oriented Vibooks plugin skill: ${skill}" >&2
     exit 1
   fi
+  if ! grep -q 'The plugin already provides the bundled Vibooks workflow' "${PLUGIN_ROOT}/skills/${skill}/SKILL.md"; then
+    echo "Plugin task skill must prevent duplicate standalone skill installation: ${skill}" >&2
+    exit 1
+  fi
 done
+
+if ! grep -q 'When this skill is loaded from the official Vibooks plugin' "${PLUGIN_ROOT}/skills/vibooks/SKILL.md"; then
+  echo "Bundled Vibooks core skill must distinguish plugin mode from standalone skill mode." >&2
+  exit 1
+fi
 
 if [[ -d "${PLUGIN_ROOT}/skills/vibooks-mcp" ]]; then
   echo "MCP implementation details must not remain a primary user-visible skill." >&2

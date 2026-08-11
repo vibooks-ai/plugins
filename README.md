@@ -1,7 +1,8 @@
 # Vibooks Agent Plugin
 
-Vibooks turns receipts, bills, invoices, and bank or card statements into
-reviewable, reconciled small-business books with your own AI agent.
+Vibooks is professional bookkeeping software for small businesses and
+bookkeeping firms. With your own AI agent, it turns receipts, bills, invoices,
+and bank or card statements into reviewable, reconciled books.
 
 The plugin helps an agent:
 

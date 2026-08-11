@@ -12,6 +12,10 @@ description: >
 Follow the bundled `vibooks` skill for professional bookkeeping treatment,
 source evidence, jurisdiction, tax, correction, and verification rules.
 
+The plugin already provides the bundled Vibooks workflow. Do not install a
+duplicate standalone skill with `npx skills`; use the agent client's plugin
+manager for plugin updates.
+
 1. Run `vibooks_readiness` when available and confirm the intended company,
    book, accounting period, and source-document scope.
 2. Read the original receipts, bills, invoices, statements, and attachments.
