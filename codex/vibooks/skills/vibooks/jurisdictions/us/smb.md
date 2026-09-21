@@ -8,6 +8,23 @@ Scope: ordinary United States small-business bookkeeping on the current shipped
 Vibooks product, with conservative treatment of state and local tax variation.
 This profile is not a full 50-state filing handbook.
 
+## Contents
+
+- Use this profile when
+- Authority order
+- Reporting-basis default
+- Evidence sufficiency and statement rules
+- Current-product routing
+- Chart-of-accounts rules
+- Tax control accounts and tax codes
+- Accountant handoff package
+- Account numbering guidance
+- Units of measure
+- Stop and ask when
+- Do not do
+- Future product mapping
+- Reference points
+
 ## Use This Profile When
 
 - the book or company country is the United States

@@ -6,6 +6,23 @@ Use this template when adding a new country or region profile under
 Keep the profile pragmatic, conservative, and tied to the current shipped
 product. Do not imply first-class product support that does not yet exist.
 
+## Contents
+
+- Use this profile when
+- Authority order
+- Reporting-basis default
+- Evidence sufficiency and statement rules
+- Current-product routing
+- Chart-of-accounts rules
+- Tax control accounts and tax codes
+- Account numbering guidance
+- Units of measure
+- Stop and ask when
+- Do not do
+- Future product mapping
+- Reference points
+- Authoring rules
+
 ```md
 # <Country Or Region> Jurisdiction Profile
 

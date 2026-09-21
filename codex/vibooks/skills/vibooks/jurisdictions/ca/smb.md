@@ -8,6 +8,24 @@ Scope: ordinary Canadian private-enterprise and small-business bookkeeping on
 the current shipped Vibooks product. This profile is not a full handbook or tax
 advice substitute.
 
+## Contents
+
+- Use this profile when
+- Authority order
+- Reporting-basis default
+- Evidence sufficiency and statement rules
+- Current-product routing
+- Canadian payroll and vacation-pay bookkeeping
+- Chart-of-accounts rules
+- Tax control accounts and tax codes
+- Accountant handoff package
+- Suggested optional accounts
+- Account numbering guidance
+- Units of measure
+- Do not do
+- Future product mapping
+- Reference points
+
 ## Use This Profile When
 
 - the book or company `country` is Canada
@@ -119,6 +137,511 @@ Current official product path:
 
 Do not claim that Vibooks has a built-in CRA filing integration or a complete
 Canadian chart package unless the shipped product actually exposes one.
+
+## Canadian Payroll And Vacation-Pay Bookkeeping
+
+Native Payroll requires the exact Canadian native module, an unused purchased
+Canadian Payroll place explicitly enabled for the local Canadian Company, and
+current statutory readiness. Check the live entitlement and allocation state
+before calculation or posting. A standard bookkeeping subscription authorizes
+recording results supplied by an accountant or external payroll provider; it
+does not authorize Vibooks payroll calculation or employee pay-statement
+generation. Never consume a Payroll place without the owner's explicit
+selection. Once enabled, that place is fixed for the paid period; Company
+archive or deletion does not release it.
+
+If restore reconciliation reports more current-period Canadian Payroll
+allocations than the signed limit, do not calculate a new payroll result or try
+to clear or move an allocation. Follow the discovered billing recovery action:
+increase the paid current-period quantity, resolve billing first when required,
+or wait for/reactivate into a new paid period. Retained source-bound native
+history may still use only the narrow correction rules below.
+
+Historical corrections without a current Payroll place are limited to the
+original posted source and its retained, verified authorization. They still
+require an active base company and the official correction workflow. Do not
+backdate a new payroll run, add a new employee to an amendment, or change the
+original pay-date period to obtain historical access. If retained evidence or
+whole-plan validation is missing, stop before reversal; never manufacture proof
+or leave a partial correction. For a retained-source native preview, resolve
+the live request schema and provide `correction_source_id` for the original
+posted record. This does not authorize a new posting: keep the same employee,
+economic event and pay-date period, and use the official correction operation.
+Older records without verified retained authorization require a current Payroll
+place. Current statutory readiness remains required.
+
+For supported Canadian payroll dates, treat statutory payroll and vacation pay
+as effective-dated, server-selected bookkeeping workflows. Never extend a prior
+rule release because the next interval appears unchanged. If Vibooks reports a
+missing official release, unresolved coverage, incomplete service history, an
+unsupported employee class, or an unknown earning meaning, stop rather than
+guessing.
+
+Canadian pay statements are part of the posted payroll record, not a separate
+document-import or POS workflow. Before activation, use setup readiness to
+confirm one pay-date-effective employer payroll identity, each employee's sole
+payroll identity and employee code, and an explicit employment-standards
+jurisdiction. Tax province and employment-standards jurisdiction are separate;
+never infer federal coverage from the business industry or tax province.
+
+For actual-withholding correction matters, follow the live correction detail
+and the payroll posting workflow at skill-root path
+`references/workflows/posting.md`.
+Retained actual amounts, calculation eligibility and unresolved legal remedies
+are separate. A checkpoint never creates a refund, credit or amended filing;
+later facts remain in immutable history and may require revalidation. Keep
+unknown facts explicit and stop when the server reports unavailable rules or
+missing evidence.
+
+For an ordinary supported pay period:
+
+1. read `/v1/books/{book_id}/payroll-rule-readiness`; Vibooks runs this check
+   automatically when Payroll opens and before calculation, batch creation, or
+   posting. If a headless workflow observes `pending`, POST the same resource to
+   run the system-owned check; this is not a request for the user or Agent to
+   certify statutory rules. Follow `calculation_state` and the server's posting
+   guard: `pending` requires a fresh check and `blocked` requires reviewing the
+   server's current correction target. The legacy aggregate `status` may remain
+   `blocked` while `calculation_state` is `ready`; that does not resolve the
+   correction matter or its legal remedy. A retained actual-withholding matter is
+   reviewed through its correction detail, not automatically reversed. Other
+   supported corrections use the statutory reverse/replace workflow. Run the
+   check again after correction. Never ask Vibooks to use an older revision. Posted
+   payroll keeps the exact revision originally used, while the payroll pay date
+   selects the applicable legal interval regardless of the current or activation date
+2. create the employer identity and employee statement profile through their
+   first-class APIs and confirm setup readiness before posting; Vibooks
+   automatically activates mandatory statement generation with the first
+   supported native payroll post, and incomplete setup must fail that post
+   atomically rather than leave a posted payroll without a statement. A generic
+   calculation preview does not establish posting readiness: select the
+   employee and complete the identities and statement setup for the actual pay
+   date. The current setup overview cannot certify another pay date. Follow
+   missing-field errors without removing native calculation evidence
+3. treat a saved default-hours value only as a proposal; confirm the exact
+   current-period paid, worked and payment hours from a timesheet, employer
+   record, employee record or explicit operator confirmation
+4. pass the typed `pay_statement_facts` through calculation preview and carry
+   the server-returned draft and fingerprint unchanged into run or batch post
+   (`salary_hours_worked` is supplied only for a salary profile; earning meaning
+   always comes from the server's versioned payroll item and is never caller-set)
+5. after post, read the statement through its payroll-run link or list API;
+   render the retained PDF/HTML or export the batch ZIP without marking it as
+   delivered
+6. for every supported Canadian jurisdiction, read the statement's
+   server-derived `paper_handoff` projection before acting; `not_recorded` means
+   only that no current paper-delivery fact exists and never means the cash wage
+   is unpaid
+7. record `paper_in_person` only after the real paper handoff, binding the exact
+   retained language artifact and a handoff timestamp no later than server time;
+   optionally retain an employee-acknowledgement reference, source reference and
+   note, but do not infer payment, timeliness, compliance qualification or
+   recipient confirmation from any of them
+8. correct a mistaken current handoff through preview/commit correction so the
+   original fact remains and a void or replacement successor is appended; an
+   active handoff or replacement may be replaced or withdrawn, while an active
+   withdrawal may only be restored with replacement facts and imported legacy
+   history is read-only
+9. after any handoff write, re-read list, detail and owning-run views and require
+   their `paper_handoff` status, active count, last handoff and correction-history
+   flag to agree
+10. use payroll reversal/replacement for payroll corrections; send the complete
+   current statement facts and calculation fingerprint, and never edit a
+   statement or regenerate historical content from current templates or rules
+
+Treat Payroll work surfaced by `/v1/books/{book_id}/tasks` as a versioned
+server projection, not as a durable client-side checklist. Payroll task IDs
+contain an opaque instance token; preserve the complete ID, re-read
+`/v1/books/{book_id}/tasks/{task_id}` immediately before acting, and follow only
+the returned `actions[].target` for Review, Fix, or Correct payroll. Do not
+construct an action from the task title, family name, or a cached count. A
+`missing_scopes` action must remain unavailable. If the detail read returns
+`TASK_INSTANCE_CHANGED`, discard the old ID and present the current task; if it
+returns `TASK_VERIFICATION_REQUIRED`, run or complete the retained rule-impact
+check before continuing; if the task is no longer found, treat it as resolved
+rather than recreating it. These tasks report affected-item counts and must
+never be converted into invented monetary exposure.
+
+Provincial and territorial special-pay rules are outside Vibooks' automatic
+calculation boundary. This includes overtime applicability, statutory-holiday
+eligibility and formulas, reporting or call-in pay, minimum-wage top-ups,
+scheduling rules, exemptions, and similar employment-standards questions. Do
+not call the retired employment-standard setup, work-fact, tip/opening, preview,
+or statutory-correction endpoints. If asked to have Vibooks determine one of
+these rules, stop that automation path and explain that the amount must be
+established externally.
+
+When a payroll may contain special pay:
+
+1. establish whether federal or provincial/territorial employment standards
+   govern the work. Start with the Government of Canada's federal-jurisdiction
+   and provincial/territorial directory at
+   <https://www.canada.ca/en/services/jobs/workplace/federally-regulated-industries.html>;
+   do not infer jurisdiction from UI language, residence, or payroll province
+2. use the responsible government's legislation, regulations, orders, gazettes,
+   and current employment-standards guidance for the actual work date. A search
+   result, competitor example, blog, or prior-period worksheet is not authority
+3. retain the source URL or publication, retrieval date, effective date,
+   employee classification and exemption facts, time and holiday facts,
+   formula, rounding, calculation worksheet, and unresolved assumptions
+4. an agent may prepare the worksheet, but must not decide disputed legal
+   coverage or post the result until the user, payroll professional, or legal
+   adviser confirms the applicable rule and amount. Retain who confirmed it and
+   the confirmation reference
+5. use native payroll only when an existing supported effective-dated payroll
+   item preserves the confirmed payment's exact legal and tax meaning; for
+   example, use the supported `overtime` item with confirmed hours and rate when
+   that is exact. Never relabel an amount merely to make it taxable or bypass an
+   unsupported calculation
+6. if no existing supported item is exact, do not use native payroll for that
+   run. Complete it through a qualified external payroll process, then retain
+   the detailed external result through Vibooks' discovered external-payroll
+   workflow and preserve the authority, worksheet, review, and provider evidence
+7. preview ordinary native payroll only after all applicable amounts are present
+   in exact supported items. Vibooks then applies the selected CRA or Revenu
+   Québec source-deduction release, posts the accounting, and produces the pay
+   statement; PDOC, T4032, WebRAS, and deduction tables do not determine the
+   underlying special-pay entitlement
+
+Keep the workpaper and authority evidence attached or referenced with the
+payroll support. If jurisdiction, employee class, exemption, effective rule,
+formula, tax treatment, or amount remains uncertain, do not guess or enter zero;
+leave payroll unposted and escalate for qualified review.
+
+Québec statements default to French. Select English only when an effective
+employee request has been retained. The desktop/UI language never chooses the
+formal statement language. Vibooks may brand the shared English or French
+template, while jurisdiction-specific protected content remains owned by the
+effective rule package; do not create one appearance template per province.
+When a request is recorded after payroll was posted, use the returned statement
+successor IDs. If a future-dated request has since become effective, call the
+employee language-companion materialization endpoint before rendering English;
+the prior French revision and bytes remain retained.
+
+If Vibooks returns `PAY_STATEMENT_RULE_NOT_PUBLISHED`, missing confirmed facts,
+an unsupported earning meaning or incomplete setup, do not post the payroll or
+create a manual stub. Retain the evidence, correct setup or use an external
+payroll workflow until an exact verified rule interval exists.
+
+### Payroll Remittances And Year-End Preparation
+
+Treat payroll remittances, T4 previews, and RL-1 previews as preparation and
+evidence workflows. They do not file a return, transmit a slip, distribute a
+slip, or initiate a government payment.
+
+When the connected API exposes an authority account's `ledger-origins`, use it
+only to retain documentary ownership of an external payroll credit that is
+already posted. Require the original journal and attached register, the complete
+worker/payment/component decomposition, and both original CAD and book-currency
+amounts. Registration must not post the wages or bank movement again. Do not
+infer documentary source amounts from an account balance.
+
+Read the discovered request contract. Supply explicit `origin_id: null` and
+`expected_current_generation: null` for the first generation. A supported
+evidence correction names the existing origin and exact current generation,
+retains its correction reason and uses a new request ID. Retry the same operation
+with its original `Idempotency-Key`, request ID, payload and authenticated
+connection; do not turn a lost response into a second registration. Read current
+detail and all history pages after correction or source reversal. A retained
+historical receipt is not a current readiness result.
+
+Source registration alone does not establish payment, declaration, or available
+settlement capacity. In particular, `historical_payment_status: not_established`
+is not zero paid, and `available_for_settlement: null` is not an amount available
+to spend. Follow only a separately supported settlement workflow with its own
+current proof; do not override `settlement_ready: false` or a rule-certification
+blocker with manual totals.
+
+For employer insurance, combined authority payments or payments between books,
+read skill-root path `references/workflows/employer-insurance.md`. Use only
+operations exposed and permitted by the connected API; an unavailable Québec
+rule package remains a blocker even when documentary sources are retained.
+
+For a supported remittance period:
+
+1. require the pay-date-effective CRA or Revenu Québec authority account and
+   its exact remitter type; do not infer frequency from payroll frequency or
+   the size of the current payment
+2. preview the exact installed official period and review its authority,
+   period dates, due date, included active payroll sources, liability total,
+   blockers, and fingerprint; if the assigned accelerated, weekly, or
+   twice-monthly calendar is not installed, stop instead of substituting a
+   monthly or quarterly period
+3. create the prepared remittance from the unchanged preview; `prepared` means
+   an amount and evidence package are ready for review, not that money was sent
+4. preview or download the retained remittance evidence when the owner needs the
+   exact amount breakdown and source-payroll support; preview, download and print
+   must use the same retained PDF bytes and do not mark the remittance paid
+5. make the real authority payment outside Vibooks, then call `:recordPayment`
+   once with the actual date, authority confirmation reference, funding account,
+   and unchanged remittance fingerprint. Vibooks atomically appends the payment
+   fact and posts the cash-to-payroll-liability journal, so do not create a
+   separate expense or manual journal for the same payment. If the payment is
+   greater than the remaining obligation, use the real authority-credit asset
+   account returned or selected for the excess instead of making the liability
+   negative
+6. re-read the remittance detail and require the active payment, confirmation
+   reference, journal link, paid amount, remaining amount, and any authority
+   credit to agree. Then confirm receipt or allocation independently in the CRA
+   or Revenu Québec account; Vibooks records the owner's evidence but does not
+   attest that the authority received or applied the funds
+7. fix only the mistaken field: use `:correctReference` for a confirmation-only
+   error without changing the journal; use `:withdrawPayment` to append the
+   payment and journal reversal; use `:replacePayment` to reverse the old payment
+   and atomically record its corrected successor. Carry the current snapshot
+   fingerprint and any required exact reversal approval. After an ambiguous
+   response, re-read the record before retrying and reuse identifiers only for
+   the exact unchanged action
+8. cancel only a mistaken prepared record that has no payment. Never delete or
+   cancel a paid record to rewrite history; require the payment, reference,
+   settlement and revision histories to retain every predecessor and successor
+
+For year-end preparation, use
+`/v1/books/{book_id}/payroll-tax-forms/t4:preview` for all included employees
+and also use `/v1/books/{book_id}/payroll-tax-forms/rl1:preview` for Québec
+employees. Require the previews to aggregate active immutable payroll history,
+effective legal identities, verified opening YTD facts, and signed box
+adjustments without blockers. Correct a box only through the employee's
+first-class `payroll-tax-form-adjustments` resource and reverse an incorrect
+adjustment through its reversal action; never rewrite a posted payroll snapshot
+or YTD history to force a slip total.
+
+The exact 2026 CRA T4 form package and the verified RL-1 filing package are not
+installed. T4 is therefore on-screen data review only: do not create, download,
+print, or synthesize a T4 PDF, and never fall back to another tax year's form.
+Do not describe either preview as filed, provide it as a government-accepted
+form, or mark the year complete merely because its totals balance. Export or
+file externally using the authority's accepted process until Vibooks publishes
+a separately verified filing workflow, then retain the external filing and
+distribution evidence required by that workflow.
+
+For ROE, use the discovered preparation options and retained non-official review
+report. Attempt a Payroll Extract `.BLK` only when the live contract explicitly
+returns `customer_export_ready: true`; otherwise complete the record in ROE Web.
+Even when enabled, the file is a draft `Issue=D`, not an issued ROE. Never place
+the full SIN or CRA payroll account number in HTTP API fields, CLI arguments,
+agent prompts, logs, or screenshots. Service Canada alone supplies the official
+PDF after issue.
+
+Vacation pay is a general employee-liability capability, not a restaurant or
+POS feature. Use it for any supported employer that must track money earned,
+paid, and still owed to an employee:
+
+1. propose the employee's jurisdiction, general-class status, service start,
+   reference year, and policy mode from reviewed business evidence; ask the
+   operator to confirm uncertain facts instead of making a legal-coverage claim
+2. configure effective-dated Vacation Pay Expense and `Vacation Pay Payable`
+   accounts, then create the effective employee policy; BC/ON pay-each policies
+   also require the written or electronic agreement record
+3. for a Sage or other cutover, analyze employee detail into explicit statutory
+   earned, contractual extra, paid, owed, vacationable-wage, and reference-period
+   facts; never propose a rule-release ID because Vibooks selects it from the
+   employee jurisdiction and cutover date and recalculates the statutory amount;
+   for Québec protected-absence history, record the reviewed exact-period
+   absence fact set before preview so opening uses the section-74 formula;
+   split history at a service-rate boundary when Vibooks asks for dated detail;
+   the sum of positive openings must tie to the source control balance, while a
+   fully paid pay-each history uses the zero-control history disposition
+4. ordinary Canadian payroll previews each
+   vacation earning from exact posted payroll components and dated earning
+   semantics inside that payroll run's immutable pay period, using its exact pay
+   date, then post only the returned calculation ID; retained mode posts expense/
+   payable, while pay-each must bind the exact vacation-pay component already
+   present in the posted payroll run
+5. settle retained vacation only through the vacation-payment workflow, binding
+   the exact payroll component that debits `Vacation Pay Payable`; use the source
+   payroll run's pay date and never backdate it or allocate a later-earned balance;
+   Vibooks owns the oldest-due employee allocation
+6. close reference periods so the official whole-period target and any true-up
+   are preserved with the exact published rule release, then use the report to
+   prove employee owed equals the Vacation Pay Payable general-ledger balance
+7. correct history through the owning vacation calculation's reversal using a
+   fresh request ID and reviewed approver, then create a new preview with
+   `replaces_calculation_id` and post it with another fresh request ID; never
+   edit a posted vacation event, allocation, or journal
+
+For Alberta monthly vacation source facts exposed by the connected API, first
+read the current compensation and employment history using the employee's
+`vacation-pay/compensation-facts` and `vacation-pay/entitlement-facts` routes.
+Use live discovery for the complete request schemas and allowed operations.
+Follow `next_cursor` until `has_more` is false; a partial page is not the full
+source history. Read access requires `read`; recording facts requires
+`draft_write` and the effective payroll module.
+
+A compensation source requires `request_id`, `expected_revision_id` and typed
+`facts`. Send explicit null only for the first revision; otherwise name the
+highest numbered revision in the complete returned history; page order is not
+revision order. To correct an earlier source, also
+name its current `supersedes_id` and give `correction_reason`. Employment history
+requires `request_id`, an explicit `supersedes_id` (null on first creation),
+`reviewed_from`, `reviewed_through` and the complete typed facts. A replacement
+names the active prior history and gives a correction reason. Keep original
+source references and distinguish a real later compensation change from a
+transcription correction. If history changed, read and review the current
+sources before preparing a new request.
+
+Reuse the same authenticated connection, request ID and facts only to retry
+the same operation. The recorded author comes from that connection; request
+headers cannot assign the operation to another person. Retaining source facts
+creates neither a vacation payment nor a wage or bank journal. Verify the
+result and retain its returned revision. A retry reproduces the original
+creation result, so its employment-history status can describe an older active
+version. Read the current active employment history and latest compensation
+revision again before the subsequent supported opening workflow.
+
+For current Alberta monthly obligations exposed by the connected API, use the
+employee's `vacation-pay/valuations:preview` workflow before posting a sourced
+reassessment. Read the current active employment fact, latest compensation
+revision and every active owning obligation version from the live facts and
+vacation report. Send the complete `expected_obligation_versions`, those fact
+IDs, `assessment_date`, `source_reference`, `purpose`, `actual_episodes` and
+`proposed_payment_allocations` required by the live request contract. For a
+`reporting_estimate`, use an empty actual-episode array and empty payment map.
+Do not supply an assessed total or replace missing source history with a
+percentage estimate.
+
+For `vacation_taken`, retain the actual dated work-day portions, evidence and
+any required shorter-period agreement. Name each owning obligation and a
+distinct source ID. An explicit correction identifies `replaces_source_ids`,
+or uses `retired_episode_sources` for incorrectly recorded use; it does not
+silently edit an older final amount. Both retained active use and new actual
+portions must occur on or before `assessment_date`. A request before any such
+portion, including one crossing the cutoff, is rejected; this current-state
+workflow is not a retrospective report that can move future leave into an
+earlier period. Equal-cutoff and later assessments preserve the original final
+use evidence and amounts. Correct the source through its supported workflow
+instead of changing dates merely to bypass the refusal.
+
+Review every returned owner measurement, the complete original/common
+comparison and any terminal residual. Verify statutory and contractual-extra
+amounts separately from their actual owning payments. A preview records a
+calculation without changing payable balances, actual use claims or cash.
+Post the reviewed calculation with its live `post-valuation` operation and a
+`request_id`, using the same authenticated connection. The product rechecks
+sources, versions, actual use, payment history and fiscal locks in the posting
+transaction. Retry the identical operation with the same ID only for its
+original receipt. If a source changes or the preview becomes stale, read the
+current facts and prepare a new preview; do not force the old calculation to
+post.
+
+A posted reassessment records only the provision difference. A null journal
+ID can be correct when the net difference is zero but individual owners need
+opposite adjustments. Neither a reassessment nor an `advance_payment`
+assessment records a new cash payment, creates a payroll run or proves that a
+planned vacation was taken. Use the separately supported owning payroll and
+payment workflows for actual settlement. To undo a posted reassessment, use
+its authorized calculation `reverse` operation with the required reason,
+date and approval. It preserves outside payments and historical source
+records. Changed downstream owners, actual use or payment history can block
+reversal even when the displayed balance has returned to its earlier value;
+resolve those dependencies rather than deleting or rewriting the history.
+
+For a newly recognized or previously reversed terminated monthly spell, use
+`new_termination_sources` with its actual `spell_started_on` and complete
+ordinary `wage_history`. Include the current version of a reversed owner;
+do not invent another obligation to recover recognition. Corrections to an
+active terminal owner use its `termination_wage_histories` entry. Keep annual
+and terminal owners separate, including when due on the same date, and review
+the complete spell comparison before posting.
+
+For an advance, use an `advance_payment` assessment on the actual payroll pay
+date and explicitly allocate the intended gross amount to its owners. A
+proposed vacation schedule is not evidence of actual use. Preserve an advance
+when leave is postponed or cancelled; later actual leave is valued using its
+applicable normal wages, with the existing payment credited once. Zero payable
+does not establish that untaken leave is final or settled. A later increase
+adjusts the liability only. A paid excess requires separate review, not an
+automatic employee receivable or refund.
+
+Prepare the actual native payroll through the supported calculation and post
+its sealed draft. Retain its exact posted vacation earning component, pay
+date, statement and journal. For the vacation payment preview, supply
+`monthly_assessment_calculation_id`, `payroll_run_id` and
+`vacation_pay_component_id` from the reviewed current workflow. A selected
+terminal owner requires its complete spell wage evidence; an annual owner's
+payment must not invent terminal evidence. If facts or owning balances have
+changed, preserve the actual payroll and reassess the vacation rights before
+linking it. Do not recreate payroll to bypass a stale assessment.
+
+Post the stored payment preview using the same request identity for an
+identical retry. Linking the gross vacation component records no second cash
+movement. Keep that allocation separate from payroll deductions and net bank
+payment. A correction must follow the owning payroll, bank-match and vacation
+link dependencies and required approvals. Preserve the original receipt and
+use a newly reviewed assessment for any replacement payroll.
+
+The connected desktop monthly workflow can record compensation and employment
+facts, prepare and post assessments, and review their reversal. Complex
+historical opening reconciliation remains an agent/API preparation workflow.
+Review the opening date, source-owned periods, actual paid allocations, unpaid
+amounts and evidence in the opening view before recording the prepared
+calculation. Distinguish retaining historical facts, linking an existing
+payable and recording an opening liability. None records a new bank payment.
+Do not substitute the percentage-wage opening form for monthly source facts.
+
+For Alberta monthly opening calculations exposed by the connected API, obtain
+the current request contract through discovery. Each historical payment in
+`monthly_sources.actual_payments` needs its original `payment_id`, `paid_on`,
+complete `gross_amount`, the `allocated_amount` belonging to that reference
+period, and `source_reference`. Do not invent another payment identity for a
+second allocation. One actual 500.00 payment can fund 250.00 in each of two
+periods; it cannot fund 500.00 in each. Leave unallocated gross and an older
+period's paid excess separate from other periods' unpaid amounts. A zero
+allocation retains a known source without crediting the period; omitting the
+required allocation field is not equivalent to zero. These historical facts do
+not record another bank payment or create payroll wages.
+
+For an ended Alberta monthly employment spell, retain the complete sourced
+`termination_wage_history` required by the live opening contract. Its wage
+slices have inclusive `earned_from` and exclusive `earned_to_exclusive` dates,
+original component identities and reconciled component totals. Keep the
+original-anniversary and common-anniversary wage windows separate; let the
+product determine the statutory comparison and residual. Do not supply a
+pooled wage or paid total as a substitute. Include the terminal obligation even
+when its residual is zero or employment ended before the first annual award.
+Use `history_only_zero_control` for a wholly zero opening; do not create a zero
+journal. A monthly row's `vacationable_wages: null` means that scalar is not
+applicable, not that the employee earned zero wages. Actual payments after the
+termination date and before the opening date remain valid source facts, with
+their existing owning allocation. Keep them distinct from recording new cash.
+
+Reversing an opening journal reverses recognition, not the actual payment or its
+attribution. Reuse the same retained attribution when reopening. To correct an
+attribution, first reverse its owning opening recognition, then review the
+report's `current_monthly_payment_history` for the employee. Submit
+`payment_reconciliation` with all current `expected_obligation_versions`, a
+reason and source reference; cover every prior owning period and retain every
+actual source, including sources now allocated zero. Preview and post the
+reviewed replacement using the live contract. If original evidence shows a
+mistyped or duplicate payment identity, explicitly use the correction's
+`source_replacements` mapping to its final canonical identity. A null target
+retires an incorrectly recorded source; it does not record a refund. Do not
+silently trim colliding IDs, drop a genuine payment or reuse a retired ID as new
+capacity. Preserve evidence for the correction, including any reversal of an
+earlier mistaken retirement. If the versions changed, refresh and review again. Resolve `VACATION_PAYMENT_SOURCE_RECONCILIATION_REQUIRED`
+from the original evidence; never bypass it with new source IDs. An
+`VACATION_OPENING_PAYMENT_SOURCE_OVERALLOCATED` result means the proposed
+allocations exceed the actual source amount. Preserve the old operation's
+replay and correction history instead of rewriting it. Use the capabilities exposed by the connected product version; a
+prepared historical reconciliation does not imply a desktop editor for those
+complex source inputs.
+
+If a vacation post or reversal returns
+`VACATION_STRICT_APPROVAL_UNSUPPORTED`, stop. The initial small-business
+vacation workflow does not post while the book requires separate strict
+approvals. Do not treat a free-text approver as authority and do not recreate
+the vacation entry manually; ask whether the operator wants to use a supported
+light/standard approval mode.
+
+AI analysis of Sage reports, payroll registers, employment agreements, or other
+source material produces proposed facts and first-class Vibooks calls; it is not
+a file-import shortcut and must not bypass the same preview, approval,
+reconciliation, and correction controls.
+
+Keep the scope bookkeeping-first. Vibooks records vacation money and the
+payable; it does not schedule PTO, approve leave, calculate a restaurant tip
+pool, operate a POS, submit government filings, or replace professional legal
+advice.
 
 ## Chart-Of-Accounts Rules
 

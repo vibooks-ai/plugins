@@ -8,6 +8,21 @@ Scope: ordinary Japanese company bookkeeping for small-business management
 books and accountant review packages on the current Vibooks product. This
 profile is not a tax-return filing workflow or tax advice substitute.
 
+## Contents
+
+- Use this profile when
+- Authority order
+- Reporting-basis default
+- Current-product routing
+- Chart-of-accounts rules
+- Tax control accounts and tax codes
+- Evidence and review rules
+- Account numbering guidance
+- Stop and ask when
+- Do not do
+- Future product mapping
+- Reference points
+
 ## Use This Profile When
 
 - the book or company `country` is Japan

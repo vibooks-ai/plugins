@@ -4,6 +4,22 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-21
+
+- Prepare the `0.4.0` release from the public `0.3.4` baseline; intermediate
+  workspace version numbers were development iterations and were not releases.
+- Add the complete Canadian payroll workflow to the bundled Vibooks skill,
+  including authority-owned statutory release selection, employee setup, pay
+  runs, vacation and insurance treatment, pay statements, retained corrections,
+  remittances, year-end records, and fail-closed unsupported special-pay cases.
+- Expand source-aware bookkeeping guidance for opening facts, journal currency,
+  customer invoicing, accountant report access, verification, reconciliation,
+  close, and immutable correction identities.
+- Document Small Business trial and subscription behavior, company and Book
+  capacity, country scope, quota changes, renewal, recovery, and cancellation.
+- Add English Codex setup and first-use routing guidance, explain plugin skill
+  updates, and honor the update-check cache without installing duplicate skills.
+
 ## [0.3.4] - 2026-08-11
 
 - Add a repeatable OpenAI skills-only package build instead of relying on a
@@ -48,7 +64,8 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 - Package Codex and Claude Code wrappers from the shared Vibooks workflows.
 - Add local MCP tools for readiness, discovery, controlled writes, review, and update status.
 
-[Unreleased]: https://github.com/vibooks-ai/plugins/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/vibooks-ai/plugins/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/vibooks-ai/plugins/compare/v0.3.4...v0.4.0
 [0.3.4]: https://github.com/vibooks-ai/plugins/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/vibooks-ai/plugins/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/vibooks-ai/plugins/compare/v0.3.1...v0.3.2
