@@ -16,7 +16,7 @@ description: >
   AI-assisted Vibooks bookkeeping against original source evidence in a clean
   review workspace without reusing prior extraction artifacts.
 metadata:
-  skill_version: 1.2.0
+  skill_version: 1.2.1
   source_repo: vibooks-ai/skills
   update_check: https://vibooks.ai/skills/manifest.json
   install_command: npx skills add vibooks-ai/skills --skill vibooks -g
