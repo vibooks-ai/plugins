@@ -4,6 +4,12 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 
 ## [Unreleased]
 
+- Refresh the bundled Vibooks skill for package-gated 2026 T4 employee-copy
+  PDF and ROE Web draft `.BLK` handoff through the desktop app. Keep ordinary
+  CRA XML filing unavailable until its separately verified annual package, and
+  distinguish local save from government submission, employee delivery, and
+  an issued ROE PDF.
+
 ## [0.4.0] - 2026-09-21
 
 - Prepare the `0.4.0` release from the public `0.3.4` baseline; intermediate

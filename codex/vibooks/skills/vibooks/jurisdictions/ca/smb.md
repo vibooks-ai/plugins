@@ -406,14 +406,30 @@ first-class `payroll-tax-form-adjustments` resource and reverse an incorrect
 adjustment through its reversal action; never rewrite a posted payroll snapshot
 or YTD history to force a slip total.
 
-The exact 2026 CRA T4 form package and the verified RL-1 filing package are not
-installed. T4 is therefore on-screen data review only: do not create, download,
-print, or synthesize a T4 PDF, and never fall back to another tax year's form.
-Do not describe either preview as filed, provide it as a government-accepted
-form, or mark the year complete merely because its totals balance. Export or
-file externally using the authority's accepted process until Vibooks publishes
-a separately verified filing workflow, then retain the external filing and
-distribution evidence required by that workflow.
+Check `/v1/statutory-export-packages` separately for `t4_employee_copies`
+and `t4_cra_return_xml`. When the 2026 employee-copy PDF package is ready and
+the reviewed slip facts are complete, create the discovered PDF intent and let
+the desktop app collect the SIN or reviewed missing-SIN disposition and save
+the employee copies. Do not synthesize a T4 PDF or substitute another year's
+form. Save one complete employee/province slip group per PDF intent. A cancelled
+draft can start a new original only if no save was reserved. A reservation
+means the file may exist even if the local outcome is unknown; after a
+substantive prefiling correction, use a linked `replacement_possible_save`
+with an operator confirmation, not another root original. An unchanged lost
+copy requires CRA's manual marked-duplicate process. If an uncertain copy's
+only correction is a different SIN with the same last four digits, Vibooks
+cannot verify that secret-only change; use a reviewed manual correction
+process. Only the original desktop profile with its matching authorized
+local attempt can retry or recover a reserved copy; a pending attempt before
+Core confirms the reservation is not save proof. If that profile is lost,
+do not create a fresh unmarked original from the uncertain reservation.
+A locally saved copy is not distributed or filed; record paper
+delivery separately, and never label email or portal delivery as paper. The
+ordinary 2026 CRA XML return remains unavailable
+until a final package for its intended 2027 processing window is separately
+verified. Do not describe a preview, saved PDF or XML as CRA accepted, or mark
+the year complete merely because totals balance. The verified RL-1 filing
+package remains unavailable.
 
 For ROE, use the discovered preparation options and retained non-official review
 report. Attempt a Payroll Extract `.BLK` only when the live contract explicitly

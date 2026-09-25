@@ -780,34 +780,150 @@ Subledger integrity rules:
   `/payroll-tax-forms/t4:preview` operation, using active immutable payroll,
   legal identity, opening YTD, and signed box-adjustment records. Correct boxes
   through `payroll-tax-form-adjustments` and its reversal action, not by editing
-  payroll history. An omitted QPIP earnings box is not a zero correction basis:
+  payroll history. Use only monetary codes accepted for the installed tax year;
+  use the typed annual review for box 52 pension allocations in whole dollars.
+  Never encode box 45 dental eligibility or box 50 plan registration as money.
+  When discovered for the installed reporting year, read `/t4-reporting-sources`
+  with `tax_year` and the employee filter, following every page. Its
+  `source_fingerprint` covers the entire filtered collection, not one page.
+  Assign each source through `/t4-source-account-assignments` to the evidenced
+  existing CRA payroll authority account ID. Each assignment supplies its
+  source kind, ID and fingerprint, an explicit null or current `expected_head_id`,
+  and the batch's evidence reference and reason. Never infer account ownership
+  from an account label or send a full payroll account number.
+  Re-read the employee sources after assignments, then read
+  `/employees/{employeeId}/t4-reporting-facts?tax_year=2026` and append one
+  complete annual aggregate with the latest whole-employee source fingerprint
+  and explicit null or current annual `expected_head_id`. Review dental code
+  1–5 as of December 31, plan registration, pension state and whole-dollar
+  annual PA, and every account/province allocation. Allocation amounts must
+  sum exactly once to the annual amount; unable-to-apportion uses one positive
+  allocation. Record each reporting period and separate CPP/QPP, EI and PPIP
+  exemption evidence; exempt requires an entire-reporting-period basis.
+  Unknown pension/exemption review and unsupported eligibility remain blockers.
+  Missing dental eligibility and required plan registration block preparation.
+  An annual-facts correction replaces the complete aggregate through a new
+  successor; it does not patch one slip, alter wages or post a journal.
+  Re-read source assignments, annual head and preview after any correction or
+  import; retained fingerprints must never be treated as renewed review.
+  Nonzero legacy monetary box 52 evidence must be explicitly corrected rather
+  than added again to the typed annual allocation. Unsupported historical amounts remain evidence: review the
+  blocker and use the reversal action when appropriate, without deleting the
+  original or claiming it proves a nonmonetary fact.
+  An omitted QPIP earnings box is not a zero correction basis:
   reconcile any signed box 56 adjustment to the retained eligible earnings.
   Resolve annual-limit and original-payment-order blockers using source records;
   do not replace missing chronology with the date an opening balance was entered.
-  While the exact annual CRA form package is unavailable,
-  there is no T4 artifact, PDF, download, print, or employee-copy workflow; do
-  not call a removed preparation-artifact operation, construct a lookalike
-  document, or reuse another tax year's form. A balanced preview is data review
-  only and does not prove filing, acceptance, or distribution
+  Read the live `/v1/statutory-export-packages` response before offering an
+  output. Check `t4_employee_copies` and `t4_cra_return_xml` separately. If the requested 2026 T4 output has
+  `customer_export_ready=false`, remain in data review; do not construct a
+  lookalike PDF or XML, reuse another tax year's form, or claim an export is
+  available. When ready, use the discovered statutory export intent and
+  validation operations, then hand the retained intent to the official desktop
+  app for sensitive identifiers and native saving. Full SINs, RP accounts and
+  transmitter identifiers belong only in the desktop prompt, never an API,
+  agent message, log or ordinary evidence field. One CRA XML return has one
+  RP account and a reviewed slip selection; changes, cancellations and
+  additional originals retain their prior-filed lineage. Record CRA upload,
+  processing and employee distribution only as user-provided external evidence,
+  with correction or retraction history. Record T4 employee-copy delivery as
+  paper only until consent and portal eligibility can be reviewed explicitly;
+  a generic evidence reference is not enough to assert electronic delivery.
+  Before a CRA slip is filed, a corrected saved employee PDF is a
+  `replacement_unfiled` successor with the current predecessor and a reason,
+  not an `amended` CRA return. Preserve the prior PDF and its delivery
+  evidence; record delivery of the replacement separately. Prepare one complete
+  employee/province slip group per PDF intent. A cancelled draft may start a new
+  original only when no native save was reserved. A reserved copy may have been
+  saved even when the local outcome is unknown; never treat it as an unsaved
+  draft. If its printed slip facts are substantively corrected before CRA
+  filing, use `replacement_possible_save` with the current predecessor, a
+  reason and explicit prefiling confirmation. The desktop app reserves each
+  production PDF save in Core before writing the file and records local
+  authorization for the matching attempt. A pending attempt without that
+  authorization cannot be recovered as a saved copy, and another device
+  cannot take over the original profile's reserved write. An unchanged lost copy
+  needs CRA's properly marked manual duplicate process until a reviewed
+  duplicate output exists. If only the full SIN changed while its last four
+  digits stayed the same after an uncertain save, use a reviewed manual
+  correction process because Core cannot verify that change. After an accepted
+  CRA slip, use the exact accepted lineage
+  for a formal amendment; an uploaded return with unknown processing status
+  is not accepted evidence.
+  A CRA processing result marked `resolved` does not establish that any slip
+  was accepted; only `accepted` or `partially_accepted` evidence can establish
+  the prior-filed slips used for an amendment or cancellation.
+  A balanced preview or saved file does not prove filing, authority acceptance
+  or employee distribution
 - prepare an ROE data-review report only after creating the employee interruption event,
   its employment-period boundary, each applicable typed statutory-payment fact,
-  and a complete statutory-input coverage review. Then create the discovered
+  and a complete statutory-input coverage review. Review Blocks 17A, 17B, 17C,
+  and 19 separately from source records: no recorded facts does not establish
+  `reviewed_none`. A `reviewed_with_facts` section must identify exactly its
+  active facts; Block 19 must explicitly be reviewed as not applicable.
+  Supply the interruption date as its own reviewed fact, not the day after the
+  final pay period. First day worked must not follow last day paid; last day paid
+  must not follow final pay-period end, and interruption must not follow last day paid. An earlier
+  interruption must be Sunday for an evidenced D00/F00/P00/Z00 earnings reduction. Correct
+  an invalid legacy event through its replacement action and renew the affected
+  reviews before new preparation. Retain prior events and artifacts unchanged.
+  Use the latest required consecutive payroll periods for the pay frequency;
+  long employment does not require every period since hire once the reporting
+  window is complete. Do not invent zero periods to fill gaps.
+  Then create the discovered
   ROE preparation artifact and use its retained render for handoff to the person
   completing and validating the official record in ROE Web. Before attempting
   any payroll-extract file, read `payroll_extract_export` from the discovered ROE
-  preparation options. If `customer_export_ready` is false, do not construct or
-  claim a `.BLK` file; retain the non-official review report and complete the
-  record in ROE Web. Never put the full SIN or payroll account number in ordinary
-  API fields. If Block 19 special payments or another unsupported field applies,
+  preparation options using Block 11 `last_day_paid` as `as_of`, and read
+  `/v1/statutory-export-packages` for the native ROE Web draft package. If
+  `customer_export_ready` is false, do not construct or claim a `.BLK` file;
+  retain the non-official review report and complete the record in ROE Web.
+  When ready, use a retained statutory export intent and hand it to the official
+  desktop app to enter the full SIN and RP account locally and save the draft.
+  For employment spanning pay-date years, review each year's retained payroll
+  generation sources and current RP account assignments before creating the
+  native intent. The T4 annual-facts review remains limited to 2026.
+  ROE Web upload, review and issue remain separate user actions; record any
+  external outcome as user-provided evidence with correction history. Only an
+  explicit `issued` result or active legacy external-completion record closes
+  the issue task; `resolved` alone does not mean issued. Correct or retract an
+  active record before recording a conflicting result for the same worksheet.
+  Never put the full SIN or payroll account number in ordinary API fields. For Block 17B,
+  supply `holiday_date` after Block 11, a positive
+  `amount` string with exactly two decimal places, nonnegative `hours` with at
+  most four decimal places, `source_evidence_reference`, and explicit
+  `source_inclusion`: `supplemental` or `already_in_payroll`. Do not infer hours
+  from the amount. Supplemental facts must omit `source_generation_id` and
+  `source_earning_code`; already-in-payroll facts require both and must match
+  an active final-period earning for this employee, its holiday date, complete
+  amount, paid hours and their inclusion in payroll's total hours. If the source
+  cannot prove that correspondence, resolve the source or complete the case
+  externally; changing the inclusion choice does not establish evidence.
+  Review departure status explicitly: unknown blocks holiday preparation, and
+  expected return conflicts with quit, retirement or dismissal (E/G/M codes).
+  Supplemental pay adds once to Block 15B and final-period 15C; its hours count
+  only for a non-final departure. Already-in-payroll pay is not added again;
+  its proven post-Block-11 holiday hours are excluded for a permanent departure.
+  Keep one complete current fact per holiday date. Correct a duplicate,
+  incomplete legacy fact or changed amount through its existing replacement or
+  retraction action, then renew coverage and create a successor report. Retain
+  original facts and report bytes. Preserve exact source hours and round the
+  completed Block 15A total up to the next whole hour once, not per period or
+  payment. The live API contract determines which fields the connected version
+  supports; do not send newer fact shapes to a version that does not advertise them.
+  If Block 19 special payments or another unsupported field applies,
   stop instead of approximating it. Only Service Canada supplies the official
   ROE PDF after issue. Optional external-completion evidence records only what
   the user says happened outside Vibooks; it is not a Service Canada receipt
 - an ROE review-report correction creates a successor preparation artifact
   through the discovered successor operation, using the expected active
   head/fingerprint and a factual correction reason. Never overwrite the
-  original report or its PDF. T4 data corrections instead use append-only box
-  adjustments and their reversal action; no T4 artifact exists to replace while
-  official PDF output is unavailable. A later verified form-definition revision
+  original report or its PDF. T4 monetary corrections use append-only box
+  adjustments and their reversal action; source ownership and annual typed
+  facts use their expected-head successor operations. Where the employee PDF
+  package is enabled, correct a saved but unfiled PDF using its distinct
+  `replacement_unfiled` intent; otherwise remain in data review. A later
+  verified form-definition revision
   or renderer release applies only to new output and remains independently
   identifiable from the payroll calculation release
 - use RL-1 previews only for year-end preparation from active immutable payroll,

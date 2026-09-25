@@ -438,9 +438,11 @@ Before closing a period:
 13. at Canadian payroll year-end, require the T4 data preview and, for Québec
     employees, the RL-1 preview to agree with active immutable payroll YTD,
     effective legal identities, opening YTD facts, and signed
-    adjustment/reversal history; require zero blockers. While the exact annual
-    government form package is absent, require T4 PDF/download/print to remain
-    unavailable and keep filing and employee distribution explicitly incomplete
+    adjustment/reversal history; require zero preparation blockers. Check the
+    employee PDF and CRA XML package readiness separately. If the PDF package
+    is ready, use only its reviewed native employee-copy workflow; if it is
+    blocked, keep PDF/download/print unavailable. Keep filing and employee
+    distribution incomplete until their separate external evidence exists
 14. when an ROE is required, require the active interruption event, exact
     employment-history boundary, applicable typed statutory-payment facts, and
     complete field coverage to agree with posted payroll and effective legal
@@ -499,9 +501,88 @@ never silently truncate an explicit correction to make it fit an annual limit.
 If incomplete original payment chronology affects a cross-province allocation,
 retain the preparation blocker instead of guessing the order from an opening
 balance's entry date. Unrelated income limits must not require that chronology.
-For T4, verify the on-screen preview facts and blockers and also verify that no
-artifact, content, render, download, or print operation is offered while the
-exact annual CRA form package is unavailable. For each retained ROE review PDF,
+Check the installed tax year's exact monetary-code catalog and whole-dollar
+box 52 amounts. Dental eligibility and pension-plan registration require typed
+facts, not monetary box adjustments; missing required facts must remain explicit
+preparation blockers. Unsupported retained fields and fractional pension
+adjustments must remain visible for correction, without silent rounding or
+reinterpretation. Verify invalid nonmonetary fields do not enter monetary
+summary totals, and that reversal preserves the original evidence.
+For the discovered T4 annual-facts workflow, inspect every page of employee
+sources and their assignment history. Every retained payroll generation,
+history adjustment and tax-form adjustment needs evidenced ownership by an
+existing CRA authority account ID. Re-read after assignments: the collection
+fingerprint includes current assignments and covers the entire filtered
+collection. The annual review must use this fingerprint and its latest expected
+head, with a complete account/province allocation set. Verify December 31
+dental coverage, pension state, plan registration when required, whole-dollar
+PA totals allocated exactly once, and each reporting period's CPP/QPP, EI and
+PPIP review. An exemption needs entire-period evidence; unknown and unsupported
+review states stay blocked. Nonzero legacy monetary box 52 evidence must not
+be added to typed annual PA. A retained annual successor must preserve the old
+facts and must not change payroll amounts or create a journal. After a portable
+clone, internal source/account/head IDs may change, but old evidence and source
+fingerprints do not certify the new source collection: require renewed
+assignment and annual review before claiming readiness. Inspect the returned
+preview blockers after the latest review; these endpoints do not create an
+official employee copy or establish CRA filing or acceptance.
+For ROE, require a separate source-backed review for each of Blocks 17A, 17B,
+17C, and 19. Empty fact lists do not prove `reviewed_none`; each
+`reviewed_with_facts` section must match its exact active facts, and Block 19
+must be explicitly not applicable. Verify the interruption date independently
+of final pay-period end. First day worked must be on or before last day paid;
+last day paid must be on or before final pay-period end. Interruption must
+equal last day paid or be an earlier Sunday for an evidenced D00/F00/P00/Z00
+earnings reduction. Invalid historical events must block new preparation until replaced and
+reviewed again, while prior artifacts remain reproducible. Confirm that ROE
+preparation options use Block 11 `last_day_paid` as `as_of` when selecting the
+definition, rather than the interruption or preparation date.
+Verify the most recent required consecutive periods for the pay frequency,
+rather than demanding every period since hire for a long-serving employee.
+The source window is 53 weekly, 27 biweekly, 25 semimonthly, 13 monthly, or
+14 four-weekly periods, or the shorter employment history. Block 15B uses its
+own shorter earnings window; missing, duplicated, or overlapping required
+periods must remain blockers. For each Block 17B fact, verify a holiday after
+Block 11, positive exact two-decimal `amount`, nonnegative `hours` with at most
+four decimal places, explicit `source_inclusion`, and a nonempty
+`source_evidence_reference`. Unknown inclusion or an amount alone is insufficient.
+For `already_in_payroll`, verify `source_generation_id` and
+`source_earning_code` identify an active final-period source belonging to the
+same employee and book, with matching date, full amount, paid hours and proven
+inclusion in aggregate payroll hours. Missing or contradictory source detail
+must block preparation; an inclusion flag is not evidence. Supplemental facts
+must not carry those ownership fields or duplicate a holiday already in the
+final payroll period. Current facts cannot report the same holiday date twice.
+Verify supplemental money enters 15B and final 15C once, with hours added only
+for an expected return. Already-in-payroll money and non-final hours are not
+added again; permanent-departure post-Block-11 hours are excluded. Unknown
+recall blocks preparation, and an expected return conflicts with E/G/M reasons,
+including their subcodes. Verify Block 15A rounds the final aggregate upward
+once: two 40.1-hour periods report 81 hours, not 82; retained period hours stay
+exact. Incomplete legacy facts require explicit replacement/retraction and
+renewed coverage before new output, while original facts and report bytes remain
+unchanged. Follow the connected version's discovered typed fact contract.
+For T4, verify on-screen preview facts and blockers, then check the live
+readiness of `t4_employee_copies` and `t4_cra_return_xml` independently.
+Never offer a PDF render/download/print while the employee-copy package is
+blocked; a ready employee PDF does not enable XML or prove distribution.
+An unfiled corrected employee copy retains the prior file and delivery record,
+uses `replacement_unfiled` with a reason, and requires a new delivery record.
+For a reserved copy whose local save is uncertain, require a changed printed
+slip, the linked `replacement_possible_save` intent and explicit prefiling
+confirmation before another ordinary copy is saved. A cancelled unreserved
+draft may start a fresh original; a reserved or distributed copy may not.
+Each employee PDF intent covers one complete employee/province slip group.
+Only a matching, Core-authorized local attempt in the original desktop
+profile can support recovery or historical reproduction; an unapproved
+pending attempt on another device is not evidence that its file was saved.
+An unchanged lost copy needs the manual marked-duplicate process.
+If only a full SIN changes while its last four digits stay the same after an
+uncertain save, use a reviewed manual correction process; Core cannot verify
+that secret-only change. Record paper delivery only, never email or portal as
+paper.
+Only a CRA-accepted slip can support a formal `amended` copy. For each
+retained ROE review PDF,
 require the response and re-read detail to pin the exact form-definition
 activation, schema revision, PDF-renderer release, source fingerprint, revision
 lineage, immutable content hash, and byte length; rendering or downloading it

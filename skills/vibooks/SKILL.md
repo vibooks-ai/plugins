@@ -260,9 +260,10 @@ and that the latest local skill refresh could not be confirmed.
 - reconcile bank, debit-card, or credit-card statement accounts
 - run month-end checks, verify balances, and close readiness
 - run supported Canadian payroll, remittance preparation, external-payment
-  evidence and settlement, non-official T4/ROE data review, and RL-1 preview
-  workflows without treating a review report as a government form, claiming
-  that Vibooks filed a return, or claiming an authority received money
+  evidence and settlement, T4/ROE data review, and RL-1 preview workflows;
+  when the installed package explicitly enables it, hand off T4 employee-copy,
+  CRA XML, or ROE Web draft preparation to the Vibooks desktop app without
+  claiming that Vibooks submitted a return or that an authority accepted it
 
 Do not use this skill for generic accounting advice, spreadsheet-only work, or
 direct mutation of Vibooks storage.
