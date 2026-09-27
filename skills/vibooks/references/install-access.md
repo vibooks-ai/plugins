@@ -53,8 +53,18 @@ Preferred startup order:
 5. run `vibooks-cli doctor --json`
 6. if `health.ok = true` but `authenticated_api_ready = false`, follow the
    first-token rules below
+   - a normal `bookkeeper` token can instead report
+     `readiness.authenticated_api_ready = true`,
+     `readiness.entitlement_active = null`, and
+     `readiness.entitlement_visibility = admin_required`; the token works for
+     read-scoped bookkeeping access, but the License status has not been
+     verified. Follow
+     `verify_entitlement_with_owner` rather than reenrolling the token or
+     treating the License as inactive.
 7. inspect the entitlement and trial state before creating the first book:
-   - run `vibooks-cli license status --json`
+   - ask the owner to confirm the current License through
+     `vibooks-cli license status --json` or the desktop License page when a
+     bookkeeper token cannot inspect the admin-only entitlement API
    - if the entitlement is inactive, run
      `vibooks-cli license check-trial-eligibility --json`
    - if eligible, run `vibooks-cli license start-trial --book-country <ISO-COUNTRY>`
@@ -69,8 +79,9 @@ Preferred startup order:
 
 ### Company capacity, Payroll places, and existing licenses
 
-Inspect `vibooks-cli license status --json` and the live `/api/entitlements`
-operation before creating or editing Companies. A new `quota_subscription_v1`
+Have the owner inspect `vibooks-cli license status --json` and, when needed,
+the admin-only live `/api/entitlements` operation before creating or editing
+Companies. A new `quota_subscription_v1`
 License carries numeric Company and Book limits only; the licensing service does
 not choose or store local Company or Book IDs. Every retained Company and Book
 counts, including archived records. Permanent deletion through the guarded Core
@@ -349,8 +360,9 @@ token and do not fall back to any default token.
 
 ### First-Entitlement Rules
 
-1. after authenticated API access is ready, run
-   `vibooks-cli license status --json`
+1. after authenticated API access is ready, have the owner confirm the
+   License through `vibooks-cli license status --json` or the desktop License
+   page; `doctor` cannot prove License activity with a normal bookkeeper token
 2. if the desktop entitlement is inactive, run
    `vibooks-cli license check-trial-eligibility --json`
 3. if trial is eligible, run

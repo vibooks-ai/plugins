@@ -16,7 +16,7 @@ description: >
   AI-assisted Vibooks bookkeeping against original source evidence in a clean
   review workspace without reusing prior extraction artifacts.
 metadata:
-  skill_version: 1.2.0
+  skill_version: 1.2.1
   source_repo: vibooks-ai/skills
   update_check: https://vibooks.ai/skills/manifest.json
   install_command: npx skills add vibooks-ai/skills --skill vibooks -g
@@ -260,9 +260,10 @@ and that the latest local skill refresh could not be confirmed.
 - reconcile bank, debit-card, or credit-card statement accounts
 - run month-end checks, verify balances, and close readiness
 - run supported Canadian payroll, remittance preparation, external-payment
-  evidence and settlement, non-official T4/ROE data review, and RL-1 preview
-  workflows without treating a review report as a government form, claiming
-  that Vibooks filed a return, or claiming an authority received money
+  evidence and settlement, T4/ROE data review, and RL-1 preview workflows;
+  when the installed package explicitly enables it, hand off T4 employee-copy,
+  CRA XML, or ROE Web draft preparation to the Vibooks desktop app without
+  claiming that Vibooks submitted a return or that an authority accepted it
 
 Do not use this skill for generic accounting advice, spreadsheet-only work, or
 direct mutation of Vibooks storage.
