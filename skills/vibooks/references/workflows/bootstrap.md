@@ -221,12 +221,31 @@ Bootstrap defaults:
   bookkeeping presets; they do not mean Vibooks replaces a POS, PMS, or other
   front-office operating system
 
+Before creating a book, ask the person the same question the desktop app asks:
+"Does anyone else review these books before changes are final?" and send the
+answer as `--approval-level`:
+
+- no, they work alone → `light`: no second approver; the owner approves their
+  own requests, recorded as self-approved with the reason
+- yes → `standard`: a different approver approves reversals, period closes and
+  the person's own requests
+- an accountant approves every posting → `strict`: a different approver
+  approves every posting, reversal and close
+
+The API default is `light` (`strict` for an accounting firm), but still ask
+and send the answer. On every level, steps such as payroll approve and post,
+filing, close, reopen and reversals need the person's go-ahead first (see
+Approvals in `references/install-access.md`); on `standard` or `strict`
+another person approves. The person changes the level later in Books → Edit
+Book Policy; lower it only when they ask.
+
 Preferred setup command:
 
 ```bash
 vibooks-cli books bootstrap \
   --company-name "COMPANY NAME" \
   --book-name "Primary Book" \
+  --approval-level light \
   --fiscal-year-start 2026-01-01 \
   --fiscal-year-end 2026-12-31 \
   --currency USD \

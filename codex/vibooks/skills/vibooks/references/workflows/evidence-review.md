@@ -361,7 +361,8 @@ Check close readiness:
 - trial balance balances
 - balance sheet, income statement, general ledger, AR/AP aging, tax summary,
   evidence exception report, attachment manifest, and reconciliation summary
-  are internally consistent
+  are internally consistent; the AR/AP aging total ties to the AR and AP control
+  balances on the same date
 - all review exceptions are either corrected, owner-confirmed, or listed for
   accountant handoff
 

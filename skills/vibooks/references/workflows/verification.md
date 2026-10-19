@@ -7,6 +7,7 @@
 - Posted tax-code corrections
 - Tax summary review
 - Tax returns
+- Books imported by an older version
 - Evidence and attachments
 - Reconciliation
 - Month-end validation
@@ -117,6 +118,10 @@ true review date range. It returns financial statements, trial balance, general
 ledger, journal entries, A/R and A/P aging and open items, bank reconciliation
 summary, tax summary, evidence exceptions, attachment manifest, and
 jurisdiction notes as review workpapers; it does not file a tax return.
+Its open receivables and payables are the amounts open on `date_to`
+(`open_amount` in the document currency, `functional_open_amount` in the
+Book's currency); `total_due` is the functional total, in
+`total_due_currency`, with `totals_by_currency` beside it.
 Omit `sections` for the full package. When the accountant asks for a narrower
 package, pass repeated `sections` values for only the needed workpapers so the
 JSON payload and workbook tabs match the selected report pack.
@@ -171,20 +176,88 @@ the jurisdictional requirement.
 
 Rules:
 
-- prepare a draft return for the true filing period and review the summarized
-  payable and recoverable rows before filing
-- file the return only after the underlying period data is complete enough for
-  filing; the filing action generates the tax settlement reclass entry
-- use a dedicated clearing or settlement liability account as
-  `offset_account_id`; do not point the return at a bank statement account
+- documents (invoices, bills, expenses, receipts, credit notes) and entries
+  with their own tax leg post their tax at source. A tax posting run
+  (`tax-postings:preview`, then `tax-postings`) only recognises manual journal
+  lines tagged with a tax code but entered without a tax leg. Omit
+  `offset_account_id` so the tax is extracted from each line's own account. A
+  run never settles tax with the authority; file a return for that
+- a run recognises only tax that earlier runs have not; rows with
+  `correction: true` take back tax that earlier runs over-recognised. A return
+  reports its own period and never re-reports a filed one: late entries into a
+  filed period appear in the next return, late input tax credits in its rows
+  and late tax collected as an adjustment
+- work in date order. An `as_of` earlier than a standing run, or a re-filing
+  while a later return stands, is refused with `TAX_POSTING_OUT_OF_ORDER`;
+  reverse the later run or filing first
+- returns are continuous: each new return starts the day after the latest
+  filed `period_end`. `TAX_RETURN_PERIOD_GAP`, `TAX_RETURN_PERIOD_OVERLAP` and
+  `TAX_RETURN_PERIOD_BEFORE_FIRST` name the period to file or fix first.
+  Activity before the first Vibooks return is listed in
+  `earlier_activity_not_covered`; it is not part of the return and stays in
+  the tax accounts for the accountant
+- prepare a draft return for the true filing period and review its rows,
+  `adjustments`, `net_tax` and `settlement_amount` with the person before
+  filing (`tax-returns/{id}:file`), and file only once the period data is
+  complete and the person says to file it; send their words as `reason`
+- `net_tax` is exactly the net tax to enter on the form. `adjustments`
+  (`prior_report_correction`, `late_tax_collected`) correct earlier returns:
+  report them as corrections of those returns, outside the current form.
+  `settlement_amount` (`net_tax` plus `adjustments_total`) is what the filing
+  settles
+- filing moves the reported tax out of the payable and recoverable tax
+  accounts into the settlement account (`offset_account_id`), which then holds
+  the net owing to or refundable from the authority. Use a dedicated
+  balance-sheet clearing or settlement account: a tax account is refused
+  (`TAX_POSTING_OFFSET_INVALID`), an income-statement account is warned, and a
+  bank statement account is wrong. Record the payment or refund itself as a
+  separate entry against that account
+- on `TAX_RETURN_DRAFT_STALE`, compare the stored figures with `error.current`,
+  call `tax-returns/{id}:refresh`, review the new figures with the person, then
+  file
+- reversing a filing entry sets the return to `reversed`; file the same return
+  again with a `posting_date` in an open period (default today)
+- tax of a foreign-currency document is reported in the functional currency at
+  the document's exchange rate
 - keep statutory tax codes on source documents even when a purchase-side input
   tax is only partly claimable; express that by setting
   `tax_claimable_ratio` on the purchase line rather than inventing near-duplicate
   tax codes
-- once a return is filed, corrections should normally happen through the
-  underlying document correction flow plus a later amended return or later
-  period settlement decision, not through silent mutation of the original filed
-  result
+- once a return is filed, correct the underlying documents through their own
+  correction flows; the next return then carries the difference as figures or
+  `adjustments`, never a silent mutation of the filed result
+- jurisdiction profiles name the form lines and how the authority accepts
+  corrections of earlier returns; for Canada see the skill-root path
+  `jurisdictions/ca/smb.md`
+- a run or return refused with `TAX_REFERENCE_REVIEW_REQUIRED` needs the
+  tax-code review in Books Imported By An Older Version below
+
+## Books Imported By An Older Version
+
+A Book imported by a version before 1.5.0 can still name records of the
+original Book. Vibooks holds the steps those references could change until
+they are resolved:
+
+- tax codes: a tax posting run or return is refused with
+  `TAX_REFERENCE_REVIEW_REQUIRED`. Read the tax code's
+  `foreign_account_references` and `suggested_account_references`, then call
+  `tax-codes/{id}:resolve-account-references` with `dry_run: true`, mapping
+  each `foreign_account_id` to the matching tax account of this Book. Show the
+  person the dry-run counts. Once they agree, request approval (action
+  `tax_code.resolve_account_references`, target the tax code, payload
+  `{mappings}`); on `light` the owner's approval is recorded with their words,
+  on `standard`/`strict` another person approves; then send the same mappings
+  with `approval_id`
+- payroll and statutory exports: payroll source corrections are refused with
+  `PAYROLL_REFERENCE_NEEDS_REVIEW` and new T4 or ROE export intents with
+  `STATUTORY_EXPORT_REFERENCE_NEEDS_REVIEW`. Show the person the
+  `imported-reference-findings`; confirm a finding
+  (`imported-reference-findings/{id}:confirm`) only after the person has
+  checked or corrected the records involved and says so in chat. A token
+  without approver authority is refused; then the person confirms it in
+  Vibooks
+- approvals: approvals imported from another Book are expired; request new
+  ones in this Book
 
 ## Evidence And Attachments
 
@@ -405,12 +478,60 @@ Before closing a period:
 1. run trial balance
 2. run balance sheet
 3. run income statement
-4. run general ledger for review
-5. review AR and AP aging when those modules are used
+4. run general ledger for review; `reports/general-ledger` accepts `search`
+   (account code or name, description, document number, entry, date, amount)
+   and `account_id`, applied before paging: use them instead of paging through
+   every row to find a line
+5. review AR and AP aging when those modules are used. Aging amounts are in
+   the Book's currency at what each document carries, reconstructed as of
+   `as_of`; read document-currency amounts from `currencies`, never by adding
+   `amount_due` across documents. The aging total must tie to the AR or AP
+   control balance: explain any non-zero `reconciliation.ar.unattributed` or
+   `reconciliation.ap.unattributed` to the person (for example an opening
+   balance or a manual journal on a control account) and never journal it
+   away; surface every document in `qualifications`. The Overview
+   `accounts_receivable` and `accounts_payable` equal the aging total on the
+   dashboard's `as_of`; read `open_items` for overdue, per-currency figures
+   and the reconciliation, and when `open_items_unavailable` is present, say
+   the open-item figures are not available instead of estimating them.
+   Read the ages from `age_rows` (`not_due`, `past_due_1_30`,
+   `past_due_31_60`, `past_due_61_90`, `past_due_over_90`, then TOTAL) and
+   per-currency ages from `currencies[].age_rows`; `rows` is the older
+   three-bucket view whose Current also holds items up to 30 days past due,
+   so never call those items current. Overdue is the report's
+   `overdue.ar` and `overdue.ap`: invoices and bills past their due date
+   only, never vendor credits, and equal to the Overview's `open_items`
+   overdue when its aging date equals the report's `as_of`. Accountant
+   package open items carry `age_bucket` and `days_past_due` (a vendor
+   credit counts from its credit date). For the Overview's top customers
+   and vendors by cash, read `cash_rankings` (`inflows` and `outflows` of
+   `counterparty_id`, `label`, `amount`, `count`, in the functional
+   currency): the sum of each counterparty's posted cash movements. When
+   `cash_rankings_unavailable` is present, say the ranking is not available;
+   never rank customers or vendors yourself from document totals, which may
+   be in different currencies. In Tasks, `overdue-payables` lists bills past
+   their due date and `bills-due-soon` lists only bills due today or within 30
+   days; both carry `amount_currency`
 6. reconcile every bank and debit account
 7. tie every credit card to its statement
 8. confirm no unexplained unapplied receipts, unapplied payments, or orphan
    balances remain
+   A fully used foreign-currency advance or deposit, and a fully settled
+   foreign invoice, bill, vendor credit or billed purchase receipt, must be
+   zero in both the source and the functional currency. After upgrading Vibooks,
+   run FX remeasurement as of a date in an open period to clear exchange
+   differences left by earlier versions on advances, deposits, receivables,
+   payables and clearing accounts; the first run may post one-off
+   reversals on foreign deposits recognised before 1.5.0. Do not clear them
+   with manual journals.
+   When inventory is tracked, compare each inventory account with the
+   inventory value. An `inventory_valuation_review` task in
+   `GET /v1/books/{bookId}/tasks` lists `accounts` (`ledger_balance`,
+   `layer_value`, `difference`) and `items_not_restated`: after the 1.5.0
+   upgrade, inventory bought in another currency or with tax that is not
+   recoverable is valued at its functional cost, and older entries may leave a
+   difference. Show it to the person; the person or their accountant decides
+   any adjusting entry. Never post it yourself; Vibooks does not post it either
 9. when dimensions are used for departments, projects, branches, or locations,
    run grouped management reports with `group_by_dimension_id` and targeted
    slices with `dimension_filter`
@@ -704,10 +825,13 @@ and report checks, then read the current period and live close request schema.
 Submit a non-empty checklist describing checks actually performed; do not invent
 review evidence or treat a balanced trial balance alone as complete review.
 When the effective policy requires approval, create the approval request for the
-exact period action and intended request payload, have a different authorized
-reviewer approve it, and submit that same payload with the resulting approval
-ID. Creating an approval request does not approve or close the period. Do not
-change policy, impersonate a reviewer, or grant access to bypass a refusal.
+exact period action and intended request payload, and submit that same
+payload with the resulting approval ID once it is approved. On a `light` book
+ask the person first ("Shall I close <period>?") and approve with their words
+as `reason`; on `standard`/`strict` a different person approves. Close,
+soft-close and reopen always need the person's go-ahead and `reason`. Creating
+an approval request does not approve or close the period. Do not change
+policy, impersonate a reviewer, or grant access to bypass a refusal.
 Reopening also requires the supported approval and a meaningful reason; fetch
 its own live schema rather than reusing the close payload. After each action,
 read back the period and retained close or approval history. Report the period

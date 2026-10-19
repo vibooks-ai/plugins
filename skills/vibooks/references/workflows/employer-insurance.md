@@ -94,7 +94,9 @@ A complete context, a task or this guidance does not activate pending rules.
 When one book pays another book's liability, use the discovered interbook
 instruction and each book's owning settlement operation. Review the exact
 funding source, liability source, amount, date, currency and reciprocal
-accounts. Complete the required approvals and period checks in each book.
+accounts. Request the required approvals in each book: ask the person first; on
+`standard` or `strict` another person approves. Then complete the period
+checks in each book.
 A completed step in one book does not imply completion in the other.
 
 Read the current instruction position after each step. Follow its returned
@@ -127,7 +129,8 @@ financial files or instructions, or after a failed evidence refresh.
 Use the discovered payment-recording correction for mistaken recorded bank
 facts, and the allocation-recording correction for a mistaken allocation.
 Retain the exact predecessor, current generation, reason, evidence and required
-reversal approval. Withdrawing an allocation does not reverse the original
+reversal approval (ask the person first; on `standard` or `strict` another
+person approves). Withdrawing an allocation does not reverse the original
 gross bank payment. Correcting evidence must not erase an actual earlier
 refund, authority credit or employee remedy; those effects require their own
 native evidence and correction paths.

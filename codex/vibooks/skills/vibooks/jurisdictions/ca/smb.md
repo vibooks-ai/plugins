@@ -18,6 +18,7 @@ advice substitute.
 - Canadian payroll and vacation-pay bookkeeping
 - Chart-of-accounts rules
 - Tax control accounts and tax codes
+- GST/HST returns
 - Accountant handoff package
 - Suggested optional accounts
 - Account numbering guidance
@@ -389,7 +390,8 @@ For a supported remittance period:
    error without changing the journal; use `:withdrawPayment` to append the
    payment and journal reversal; use `:replacePayment` to reverse the old payment
    and atomically record its corrected successor. Carry the current snapshot
-   fingerprint and any required exact reversal approval. After an ambiguous
+   fingerprint and any required exact reversal approval (ask the person first;
+   on `standard` or `strict` another person approves). After an ambiguous
    response, re-read the record before retrying and reuse identifiers only for
    the exact unchanged action
 8. cancel only a mistaken prepared record that has no payment. Never delete or
@@ -735,6 +737,23 @@ Tax-code rules:
 Quebec, PST, and other province-specific commodity-tax setups can require extra
 jurisdiction detail. Stop and ask before creating them when the obligation is
 not explicit.
+
+## GST/HST Returns
+
+Follow the generic tax-return workflow in
+`references/workflows/verification.md`; these points are Canada-specific:
+
+- a return's payable and receivable rows are lines 103 and 106 of the GST/HST
+  return, and `net_tax` is the net tax to enter on the form
+- input tax credits of an already filed period that were entered late appear
+  in the next return's ITC row, as the CRA allows
+- `adjustments` correct earlier returns: the person files those corrections
+  with the CRA (My Business Account, Adjust a return), never on the current
+  form
+- a combined GST+QST code produces one Vibooks return; the person files the
+  QST part separately with Revenu Québec
+- whether a filed return was prepared from a tax-account balance that held
+  supplier advances or customer deposits is a question for the accountant
 
 ## Accountant Handoff Package
 

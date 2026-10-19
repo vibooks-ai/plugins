@@ -4,14 +4,28 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 
 ## [Unreleased]
 
-- Planned next release: `0.4.1`, based on the public `v0.4.0` tag.
-- Refresh the bundled Vibooks skill for package-gated 2026 T4 employee-copy
-  PDF and ROE Web draft `.BLK` handoff through the desktop app. Keep ordinary
-  CRA XML filing unavailable until its separately verified annual package, and
-  distinguish local save from government submission, employee delivery, and
-  an issued ROE PDF.
-- Explain that a bookkeeper can authenticate while License details remain
-  owner-only, so the owner must confirm an active License before first writes.
+- Planned next release: `0.5.0`, based on the public `v0.4.1` tag.
+- Refresh the bundled Vibooks skill (1.3.0): everything can be done through
+  the API, and a token acts as its person. Weighty steps need the person's
+  reason (and destructive ones the confirmation phrase from their preview);
+  Light books let the person approve their own requests, and Standard or
+  Strict books need another approver. Each Book has its own time zone, and
+  "today" follows it. Use `vibooks-cli` 1.3.0 or later.
+- Match Vibooks 1.5.0: refunds matched to the advances or deposits they
+  return, approved correction of advances or deposits found in tax accounts,
+  ordered tax posting runs and returns, and backup restore and other
+  person-only operations left to the person.
+- Foreign-currency documents and inventory cost: Vibooks places the rounding
+  cent (or books it to realized exchange gain/loss), purchase returns leave
+  stock at carrying cost, and the inventory valuation review stays with the
+  person.
+- Foreign-currency advances and deposits are used at their carrying amount,
+  with the exchange difference booked by Vibooks, and foreign deposits
+  recognise revenue at the deposit's rate.
+- Settlements of foreign-currency invoices, bills, vendor credits and billed
+  purchase receipts at their carrying amount; AR/AP aging, Overview and
+  customer and vendor balances in the Book's currency; count-only tasks and
+  cancelled vendor credits shown as closed.
 
 ## [0.4.0] - 2026-09-21
 

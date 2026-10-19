@@ -11,6 +11,9 @@
 - Chart-of-accounts rules
 - Date rules
 - Prefer first-class workflows
+- Refunds of advances and deposits
+- Credit notes, returned credit and supplier credit refunds
+- Advances and deposits outside tax accounts
 - Common posting patterns
 - Opening balances
 
@@ -29,6 +32,36 @@
   agent/API update with those original facts, then read back and compare the
   result. Do not convert the record to the book currency merely to make the
   simplified form accept it
+- a foreign-currency document converts its receivable, payable, cash,
+  deposit, advance, or clearing leg once at the document total and each other
+  line on its own; Vibooks puts the rounding cent on one of the other lines
+  (never an inventory, cost of goods sold, tax, or settlement line), and a cent no line can absorb (for example a receipt split between
+  applied and unapplied, or a deposit applied to two invoices) on realized
+  exchange gain/loss `7999`. Source amounts stay as entered. Do not adjust
+  lines, rates, or add a journal to remove that cent. Inventory and cost of
+  goods sold are carried at functional cost, not at the document rate
+- using a foreign-currency advance or deposit (`payments/{id}:apply`,
+  `receipts/{id}:apply`, a balance-mode refund, or a recognition schedule)
+  relieves it at what it still carries in the functional currency; Vibooks
+  books the difference to realized exchange gain/loss `7999`, so a fully used
+  advance or deposit is zero in both currencies. `:unapply` restores exactly
+  what the application posted
+- settling a foreign-currency invoice, bill, vendor credit or billed purchase
+  receipt (receipt or payment `:apply`, an invoice credit note, vendor credit
+  `:apply`, a bill that takes over purchase receipts) relieves it at its
+  carrying amount, the amount it still carries in the functional currency
+  after any FX remeasurement, and Vibooks books the difference to `7999`; a
+  fully settled document is zero in both currencies. A billed purchase receipt
+  moves its clearing carrying amount to the payable without an exchange line.
+  `exchange_rate` on `:apply` is accepted and validated but never used for
+  amounts, and on `:unapply` it is ignored, so omit it on both. Vendor credit
+  `application_date` must be in an open period. Creating a foreign-currency
+  document still needs its `exchange_rate`. On `FX_RATE_REQUIRED` from an
+  `:apply`, a credit note or a vendor credit application, the document's own
+  posting cannot be read: stop and report it to the person; do not retry with
+  another rate.
+  Never post a manual journal to clear an advance, deposit, receivable,
+  payable or clearing exchange difference
 - never net receivables, payables, taxes, or clearing balances against revenue
   or expense
 - do not overwrite posted history; use reversal, cancellation, credit-note,
@@ -76,6 +109,10 @@
   `entries/{entry_id}:reverse`, set `reversal_date` instead; if the
   workflow-specific date is optional and omitted, Vibooks defaults it to
   today
+- reversing an entry, transfer, settlement, bank deposit, inventory
+  adjustment, payroll or fixed-asset run, vacation calculation or recognition
+  line needs the person's go-ahead first: ask in one sentence and send their
+  words as `reason` (see Approvals in `references/install-access.md`)
 - financial reports follow posted entry dates, not the current document status
   alone
 
@@ -174,6 +211,15 @@ Choose the first-class sale before preparing lines:
 - when cash arrives after an invoice, create a `receipt` and use
   `receipt:apply`; applying the receipt settles AR and does not recognize the
   sale a second time
+- a receipt (payment) that settles invoices (bills) when it is recorded names
+  them in `applications` on create (`[{invoice_id|bill_id, amount}]`); it is
+  applied at once. To collect an opening balance, name the opening-balance
+  entry (`{opening_balance_entry_id, amount}`, at most its remaining amount).
+  Never send `unapplied_amount` below `amount_total` without `applications`
+  while the party has an open invoice (bill) of that currency and account on the
+  receipt (payment) date: it is refused (`RECEIPT_PREAPPLIED_INVOICES_REQUIRED`,
+  `PAYMENT_PREAPPLIED_BILLS_REQUIRED`). `unapplied_amount`, if sent, must equal
+  `amount_total` less the applications
 - when cash arrives before an invoice or before revenue is earned, first record
   it as unapplied customer cash in the customer-deposit liability, then choose
   exactly one of the supported prepayment paths described below
@@ -267,7 +313,8 @@ Choose one prepayment lifecycle and do not mix them:
 - **Direct deferred-revenue recognition:** use
   `receipt:create-recognition-schedule` only when evidence and the effective
   accounting policy support releasing the deposit liability directly without
-  later applying this receipt to an invoice. Confirm the recognition account,
+  later applying this receipt to an invoice. A foreign-currency deposit
+  recognises revenue at the deposit's own rate. Confirm the recognition account,
   start date, cadence, period count, dimensions, and performance facts; never
   infer them from payment date, invoice terms, or Item defaults.
 
@@ -431,6 +478,19 @@ Posting rules:
 - accrual or month-end adjustment: use the last day of the affected period
 - opening balances: use one verified cutover date
 
+Send explicit dates on every action; do not rely on a default:
+
+- `receipt_date` or `payment_date` (create with `applications` applies on that
+  date), `application_date` on `:apply`, the credit note's `posting_date`, and
+  `assignment_date` on `:assign-preapplied` (required) and
+  `:assign-credit-excess` with `returned_by_entry_id`
+- an omitted `application_date` or matching-entry date falls back to the
+  Book's today: `business_date`, the date in the Book's `time_zone`, the same
+  for every caller. It only fills omitted dates; it is never a way to back-date
+  or forward-date work
+- the credit-note excess is unapplied on the credit-note date: date the credit
+  note on or after the payment it returns
+
 If a closed period must change, stop and ask before proceeding.
 
 ## Prefer First-Class Workflows
@@ -547,13 +607,23 @@ Subledger integrity rules:
   inventory instead of requiring a separate inventory receipt or adjustment
 - do not use purchase receipts for same-day billed purchases; use bills or
   expenses directly when the supplier tax document is already available
+- a cancelled vendor credit has `unapplied_amount` "0.00" and cannot be
+  applied, including credits cancelled by earlier versions; reopen it to use
+  it again. A cancelled receipt or payment has nothing applied
 - vendor credits create payable-side supplier credit that stays available for
   current or future bill allocation until `vendor-credit:apply` uses it up
 - vendor refunds either reverse purchase-side expense/asset and tax lines or
   return vendor advances or supplier cash back to the chosen funding account
   without creating new AP
-- inventory item lines on vendor refunds issue stock automatically using the
-  refund line value instead of requiring a separate inventory issue
+- inventory item lines on vendor credits and vendor refunds (purchase returns)
+  issue stock automatically at its carrying cost, the weighted average cost in
+  the functional currency (the whole value when the whole stock goes back), not
+  at the credited amount. The difference between the credit and that cost goes
+  to the item's cost of goods sold in a functional-currency return, and to
+  realized exchange gain/loss `7999` in a foreign-currency return; a
+  foreign-currency return can leave AP at zero in the document currency with a
+  small functional residual until the next FX revaluation or settlement. Do
+  not journal these differences by hand
 - bank deposits debit the destination bank statement account and use signed
   source lines: positive lines credit non-statement sources such as
   undeposited funds, cash on hand, revenue, equity, loan liabilities, or
@@ -658,12 +728,69 @@ Subledger integrity rules:
   review the replacement; on `TASK_VERIFICATION_REQUIRED`, complete the
   retained rule-impact check; when the task is no longer found, treat it as
   resolved. Count-only Payroll tasks are not dollar exposure
+- a task's `amount` is money only when `amount_currency` is present;
+  reconciliation-needed, drafts-ready-to-post, validation-errors, period-close
+  and refund-review tasks are counted by `count` and their `amount` is
+  "0.00". Each refund-review finding states its own `currency`; never add
+  finding amounts in different currencies
+- task amounts (overdue receivables, bills due soon, unapplied receipts and
+  payments) are in `amount_currency`, the Book's currency, at what the
+  documents carry; for a customer's or vendor's balance read `open_balance`
+  (vendor credits netted, deposits and advances shown separately), never a sum
+  of `amount_due` across documents. When `amount_qualified` or
+  `unapplied_qualified` is true, one document's amount could not be measured
+  at its carrying amount; tell the person which figure is qualified instead of
+  presenting it as exact
+- every task has `kind` (`legacy`, `payroll_count` or `setup`). Review tasks
+  carry `family` and that family's fields; the core tasks (`overdue-receivables`,
+  `overdue-payables`, `bills-due-soon`, `unapplied-receipts`,
+  `unapplied-payments`, `period-close-recommended`, `payroll-batches-pending`)
+  have no `family`: identify them by `id`. Never read the English `title` or
+  `detail`
+- `preapplied-receipts-review` and `preapplied-payments-review` (family
+  `preapplied_review`, count-only): receipts (payments) recorded by an earlier
+  version that took part of their amount off AR (AP) while an invoice (bill)
+  was open. Resolve each with `receipts/{id}:assign-preapplied`
+  (`payments/{id}:assign-preapplied`): `{assignment_date, applications:
+  [{invoice_id|bill_id, amount} | {opening_balance_entry_id, amount} |
+  {deposit: true, amount}]}`, at most the finding's amount. One zero-net
+  matching entry is posted; invoice (bill) items can be undone by `:unapply`,
+  the whole assignment by reversing that entry (`entries/{id}:reverse`)
+- `credit-note-excess-review` (family `credit_note_excess_review`, count-only):
+  credit notes of an earlier version whose part above the amount due sits on
+  Customer Deposits without a receipt. Resolve each with
+  `invoices/{id}:assign-credit-excess` `{credit_note_entry_id}`: the invoice's
+  latest paying receipt (or `receipt_id`) adopts it, and refunds that returned
+  it (`refunded_amount`) then name that receipt (`credit_note_credit_amount`
+  0.00). Name refunds that paid it but are matched to other receipts in
+  `refunds: [{customer_refund_id, amount}]` (from `refund_candidates`). If a
+  manual journal already paid it back, send `returned_by_entry_id` (from
+  `journal_candidates`) instead; `CREDIT_EXCESS_ALREADY_REFUNDED` means
+  something not named paid it out: name it. A credit on a tax account is
+  corrected from the control-account findings first
+  (`CREDIT_EXCESS_ACCOUNT_MISMATCH`)
+- never post a manual journal to fix these findings; the tasks state the
+  ledger is unchanged
 - for an ordinary Canadian pay period on a light- or standard-approval book,
   use the guided payroll batch workflow: choose one schedule and exact period
   dates, preview every selected employee, review the server-returned totals and
-  posting defaults, create one draft batch, approve it, and post it atomically;
+  posting defaults, and create one draft batch. On a `light` book, show the
+  person the totals and ask "Shall I approve and post this payroll?"; send
+  their words as `reason` on approve and on post, and post atomically. On a
+  `standard` book stop after creating the batch: another person approves it;
+  then ask the person and post it with their words as `reason`;
   keep the individual-run workflow for genuine one-employee exceptions rather
   than preparing a normal multi-employee period one run at a time
+- when a draft payroll batch waits for approval (the person has not said yes
+  yet, or another person approves it), tell the person where it is: Tasks as
+  "Approve and post prepared payroll" (`payroll-batches-pending`) and Payroll
+  → Tax & Compliance → Payroll batches. Never approve it without the person's
+  go-ahead, and after `needs_other_person` do not retry
+- one employee and pay period has at most one open (draft or approved) batch.
+  On 409 `PAYROLL_BATCH_PERIOD_ALREADY_PREPARED` read the detail
+  `existing_payroll_batch_id` (the open batch) and ask the person to approve, post or cancel that batch; do
+  not create another. A retry with the same `client_operation_id` still returns
+  the original batch
 - send an explicit employee `calculation_mode`: use `profile_regular` for
   profile-derived salary or hourly pay with no item input,
   `itemized_regular` for a complete assigned regular earning set, and
@@ -739,9 +866,9 @@ Subledger integrity rules:
   employee/profile identity, calculation release/snapshot/fingerprint,
   pay-statement facts, detailed component arrays, cash account, date, and
   correction reason required by the typed request. For standard or strict
-  approval, request `entry.reverse` approval for the exact request body and
-  consume only an approved record whose `target_id` and `payload_hash` still
-  match. If any date, fact, amount, account, or reason changes, request a new
+  approval, request `entry.reverse` approval for the exact request body, ask
+  another person to approve it, and consume only an approved record
+  whose `target_id` and `payload_hash` still match. If any date, fact, amount, account, or reason changes, request a new
   approval. Keep one stable idempotency key for the unchanged approval request
   and one for the unchanged final reverse or replacement until the outcome is
   known; after an ambiguous response, retry those exact identifiers instead of
@@ -819,8 +946,11 @@ Subledger integrity rules:
   `customer_export_ready=false`, remain in data review; do not construct a
   lookalike PDF or XML, reuse another tax year's form, or claim an export is
   available. When ready, use the discovered statutory export intent and
-  validation operations, then hand the retained intent to the official desktop
-  app for sensitive identifiers and native saving. Full SINs, RP accounts and
+  validation operations, then, with the person's go-ahead and the preview's
+  phrase, start the `statutory.export` host request for the retained intent
+  (see Statutory Exports in `references/install-access.md`); the desktop app
+  takes sensitive identifiers and saves natively. Give the person the
+  returned path; never open, read, upload or quote the exported file. Full SINs, RP accounts and
   transmitter identifiers belong only in the desktop prompt, never an API,
   agent message, log or ordinary evidence field. One CRA XML return has one
   RP account and a reviewed slip selection; changes, cancellations and
@@ -878,8 +1008,10 @@ Subledger integrity rules:
   `/v1/statutory-export-packages` for the native ROE Web draft package. If
   `customer_export_ready` is false, do not construct or claim a `.BLK` file;
   retain the non-official review report and complete the record in ROE Web.
-  When ready, use a retained statutory export intent and hand it to the official
-  desktop app to enter the full SIN and RP account locally and save the draft.
+  When ready, start the `statutory.export` host request for a retained intent
+  with the person's go-ahead and the preview's phrase; the desktop app asks
+  the person for the full SIN and RP account locally and saves the draft. Give
+  the person the returned path; never open, read, upload or quote the file.
   For employment spanning pay-date years, review each year's retained payroll
   generation sources and current RP account assignments before creating the
   native intent. The T4 annual-facts review remains limited to 2026.
@@ -982,6 +1114,9 @@ Subledger integrity rules:
   `measurement_issues` separately from the immutable recognized/paid balances
 - read the current `authenticated_writer_id` from the employee's `service-facts`
   or `policies` response and use that identity as `approved_by` for NT corrections.
+  `approved_by` records a review done outside Vibooks; write it only after the
+  person confirmed the review, and never write the person's name for work they
+  did not review.
   This does not grant write permission. If the authenticated connection or its
   permissions change, reload and create a fresh preview; never reuse another
   reviewer's preview or substitute a historical author or default identity
@@ -1035,14 +1170,9 @@ Subledger integrity rules:
   installation and remains blocked from automatic YTD and all statutory use
   until a complete append-only `legacy_run_attestation` links the posted run to
   retained source records and supplies every applicable employee and employer amount;
-  never overwrite either the retained snapshot or attestation for later changes
-- before the first full backup, the owner must deliberately display the backup
-  recovery code in the local desktop, save it outside the backup location, and
-  confirm that separate copy. A backup from another or replacement installation
-  must be previewed with that recovery code before restore. Agents must not call
-  the reveal endpoint or pass a recovery code into backup preview/restore unless
-  the user explicitly requests that local recovery operation. Never place a
-  recovery code in chat, logs, filenames, bookkeeping evidence, or portable bundles
+  never overwrite either the retained snapshot or attestation for later changes;
+  a restore needs the person's go-ahead and the preview's phrase (see Backup,
+  Restore And Deletion in `references/install-access.md`)
 - when purchase-side tax is only partly claimable, keep the statutory
   `tax_code_id` on the purchase line and set `tax_claimable_ratio` between `0`
   and `1`; Vibooks will keep the non-claimable portion inside the business
@@ -1065,6 +1195,165 @@ Reimbursement and vendor-advance rule:
   account such as `Cash from owner` or `Shareholder Loan`
 - if the payment exceeds the open bill and should remain as a vendor advance or
   prepayment, route the excess through `unapplied_account_id`
+
+## Refunds Of Advances And Deposits
+
+A balance-mode vendor refund to the vendor advances account returns open
+advances (payments); a customer refund to the customer deposits account
+returns open deposits (receipts). Vibooks matches the refund oldest first, or
+to the documents named in `allocations: [{payment_id, amount}]`
+(`receipt_id` for customers). Name them when the evidence identifies the
+prepayment; the amounts add up to `refund_amount`, with at most 2 decimal
+places.
+
+- refund at most what the counterparty has open on that account, in that
+  currency, dated on or before `refund_date`.
+  `VENDOR_REFUND_EXCEEDS_OPEN_ADVANCE` or
+  `CUSTOMER_REFUND_EXCEEDS_OPEN_DEPOSIT` means no open advance covers it: ask
+  the person what the money is, and keep the refund off any other account
+  until they answer
+- customer credit from invoice credit notes: the part of a credit note above
+  what the invoice still owed is held by the receipt that paid the invoice as
+  unapplied cash (see Credit Notes, Returned Credit And Supplier Credit
+  Refunds). A customer balance refund without `allocations` returns that credit
+  first and uses open receipts only for the rest; `credit_note_credit_amount`
+  states the credit part (derived: it can change if a credit note dated on or
+  before the refund is later reversed, or after `:allocate`). Naming
+  `allocations` refunds exactly those receipts and never uses the credit.
+  `CUSTOMER_REFUND_EXCEEDS_OPEN_DEPOSIT` then means the refund is larger than
+  open deposits plus that credit; the message states both
+- returned credit: credit that a credit note gave back to one of the customer's
+  receipts (`excess_unapplications`) shows on that receipt as
+  `returned_credit_open_amount`. A balance refund without `allocations` takes
+  it first when it is dated on or before the refund, in the refund's currency
+  and deposits account, and not used by an earlier refund; then the other
+  deposits oldest first. `refund-allocations:reconcile` and upgrade repair
+  still match oldest first
+- for a return on a paid sale with no credit note issued for it, prefer a
+  document-mode customer refund over a credit note followed by a balance
+  refund. In another currency, credit-note credit leaves the deposits account
+  at the credit notes' own amounts (first in, first out; at the refund's
+  exchange rate only when it cannot be traced to credit notes), and each
+  receipt's deposit, its returned credit included, at its carrying amount; any
+  difference posts to realised exchange gain/loss (7999)
+- read back `balance_source`, `advance_allocations`, `unallocated_amount` and
+  `advance_warning`. On `advance_warning.code: OPEN_ADVANCES_NOT_USED`, stop and
+  confirm the account with the person
+- a payment (receipt) moved to a recognition schedule is fully used. Prefer
+  `payments/{id}:create-recognition-schedule` (`receipts/{id}:...` for
+  customers). A generic schedule that moves a payment needs a fully open
+  payment (`RECOGNITION_SCHEDULE_SOURCE_NOT_OPEN`) and `amount_total` equal to
+  its advance (`RECOGNITION_SCHEDULE_SOURCE_AMOUNT_MISMATCH`)
+
+The `refund_advance_review` task lists refunds and advances to review, by
+finding code:
+
+- F1, a refund not matched to an advance: unapply a wrongly applied advance,
+  then `:allocate` the refund; or replace or cancel the refund
+- F2, an account that could not be identified: ask the person which account it
+  is, then replace the refund, document or schedule with an account of this
+  Book
+- F3, F4, and F5 caused by stale links: call `refund-allocations:preview` and
+  show the person the plan (open amounts of documents in closed periods may
+  change; the ledger does not). Then call `refund-allocations:reconcile` with
+  its `plan_digest`; on `REFUND_RECONCILE_PLAN_CHANGED`, preview again
+- F5 the reconcile cannot explain, and F6: leave them listed for the
+  accountant
+- F7, a recognition schedule an earlier version linked to a payment (receipt)
+  with an amount other than its advance (deposit); it holds the smaller of the
+  two. Show the person both amounts. With their agreement, reverse any posted
+  lines with `recognition-schedules/{id}:reverseLatest`, then `PATCH` the
+  schedule with `amount_total` equal to the advance (a new plan such as
+  `period_count` may go in the same request). Any other edit that keeps the
+  wrong amount is refused with `RECOGNITION_SCHEDULE_SOURCE_AMOUNT_MISMATCH`.
+  If the person does not want the full advance recognised, cancel the schedule
+  and ask what the rest of the advance is
+
+Change open amounts only through these actions and the documents' own unapply,
+cancel or replace workflows.
+
+## Credit Notes, Returned Credit And Supplier Credit Refunds
+
+- an invoice credit note above the amount due gives that part back to the
+  receipt that paid the invoice: it is unapplied from the invoice's receipt
+  applications (the latest first, or only from `receipt_id`) dated the
+  credit-note date, and the response lists `excess_unapplications`. The receipt
+  then holds it as unapplied cash: refund it with a balance-mode
+  `customer-refund` to Customer Deposits or `receipt:apply` it to another
+  invoice. A balance refund without `allocations` uses the customer's returned
+  credit first, then the oldest open receipts; name the paying receipt in
+  `allocations` when the evidence says which money goes back
+- a credit note on an invoice in another currency needs `exchange_rate`
+  (`FX_RATE_REQUIRED` otherwise)
+- leave `unapplied_account_id` out of a credit note; another account than the
+  paying receipt's deposit account is refused
+  (`INVOICE_CREDIT_DEPOSIT_ACCOUNT_MISMATCH`). A credit note whose excess no
+  receipt application dated on or before it covers is refused
+  (`INVOICE_CREDIT_EXCEEDS_SETTLED_AMOUNT`): date it on or after the payment, or
+  credit only the amount due. A credit beyond what was invoiced and paid is not
+  supported; until a customer credit document exists, a goodwill cash payment is
+  a document-mode `customer-refund`
+- reversing a credit note's entry does not re-apply the receipt: the invoice is
+  due again and the receipt keeps the returned amount open; apply it again if
+  that is what happened
+- a document-mode `customer-refund` while the customer holds returned credit
+  carries `advance_warning.code` `RETURNED_CREDIT_NOT_USED`. If the refund pays
+  that credit back, cancel it and record a balance refund instead, or revenue
+  is reduced twice
+- a supplier's cash refund of supplier credits is a balance-mode `vendor-refund`
+  naming `credit_allocations` (`[{vendor_credit_id, amount}]`), or with
+  `refund_account_id` the payables account (open credits are taken oldest
+  first). Never record it as a document refund or a journal entry. A refund made
+  this way cannot be matched with `:allocate`; cancel and reopen restore and
+  consume the credits; a refunded vendor credit cannot be cancelled or replaced
+  until the refund is cancelled
+- a supplier refund that 1.4.3 recorded as a balance refund to Vendor Advances
+  (1305) was matched by 1.5.0 to the supplier's open advances; nothing fixes it
+  automatically: cancel that refund and record it again with
+  `credit_allocations`
+- on the cash basis, credit notes and vendor credits are recognised with the
+  document they settle; an open vendor credit counts only when refunded in cash
+
+## Advances And Deposits Outside Tax Accounts
+
+GST/HST and sales-tax accounts (report category `tax_payable` or
+`tax_receivable`) hold tax only. Supplier advances belong in a vendor advances
+account and customer deposits in a customer deposits account. Vibooks refuses
+a tax account in a control field such as `default_ap_account_id`,
+`refund_account_id` or a schedule's source account
+(`CONTROL_ACCOUNT_IS_TAX_ACCOUNT`).
+
+Earlier versions could record advances or deposits in a tax account.
+Reopening, replacing or scheduling an affected payment, receipt or refund is
+then refused with `CONTROL_CORRECTION_REQUIRED` (task id in the error
+details). Correct them from the `control_account_findings` task:
+
+1. read `control-account-findings` and call
+   `control-account-corrections:preview`; show the person the plan, the manual
+   entries listed and any filed returns overlapping the dates
+2. send `acknowledged_manual_entry_ids` only for entries the person confirmed
+   are not corrections of the listed documents
+3. at `standard` or `strict` approval, request approval with action
+   `control_account.correct`, target the book id and payload the preview's
+   `approval.request_payload` exactly, and let another person approve. At
+   `light` no approval request is needed; a plan with acknowledged manual
+   entries is the person's decision and needs a token that can approve: on
+   `CONTROL_CORRECTION_PERSON_DECISION_REQUIRED`, request approval the same way
+4. ask the person first, then run `control-account-corrections` with the
+   preview's `fingerprint`, their words as `reason` and any `approval_id`; on
+   `CONTROL_CORRECTION_STALE`, preview again
+5. verify that the tax accounts hold no supplier or customer document legs and
+   the findings list is empty
+
+The correction's reclassification entries carry no tax code and leave tax
+amounts, returns and tax posting runs unchanged; it is the only way to move
+these balances between a tax account and an advance or deposit account. Undo
+it only by reversing its run
+(`control-account-corrections/{runId}:reverse`, approval action
+`control_account.reverse_correction`, target the run id, payload
+`{"run_id": runId}`). Run reversal is refused with
+`CONTROL_CORRECTION_REVERSE_BLOCKED` once a corrected document has later
+activity or a later run covers it.
 
 ## Common Posting Patterns
 
@@ -1101,12 +1390,13 @@ Reimbursement and vendor-advance rule:
 - loan proceeds: debit bank, credit loan payable
 - loan repayment: prefer `expense`; debit loan principal, debit interest
   expense if any, and credit bank for the full payment
-- tax remittance: prefer `expense`; debit the tax liability being settled and
-  credit bank or cash
-- tax return preparation: prefer `tax-returns`; prepare a draft return for the
-  filing period, review the summarized payable and recoverable rows, then file
-  the return so Vibooks generates the settlement reclass entry through the
-  chosen tax-settlement clearing account
+- tax remittance: prefer `expense`; debit the tax settlement account or other
+  tax liability being settled and credit bank or cash. For a refund from the
+  authority, prefer `bank-deposits` with the settlement account as the source
+  line
+- tax return preparation: prefer `tax-returns`; filing moves the reported tax
+  out of the tax accounts into the chosen settlement account (see Tax Returns
+  in `references/workflows/verification.md`)
 - debit-card purchase: prefer `expense`; economically it debits expense,
   prepaid, inventory, fixed asset, liability settlement, or equity draw lines
   and credits bank
