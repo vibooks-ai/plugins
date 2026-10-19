@@ -25,7 +25,7 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Vibooks",
-    "shortDescription": "Turn source documents into reviewable, reconciled books with Vibooks software",
+    "shortDescription": "AI bookkeeping from documents",
     "longDescription": "Use your AI agent with Vibooks, professional bookkeeping software for small businesses and bookkeeping firms. Turn receipts, bills, invoices, and bank or card statements into source-linked, reviewable records. Record transactions through proper workflows, reconcile accounts, independently review entries, and prepare for month end. Books stay on your device by default, and every write remains user-controlled.",
     "developerName": "Block Software Inc.",
     "category": "Finance",
@@ -37,6 +37,7 @@
     "websiteURL": "https://vibooks.ai/",
     "privacyPolicyURL": "https://vibooks.ai/privacy/",
     "termsOfServiceURL": "https://vibooks.ai/terms/",
+    "supportURL": "https://vibooks.ai/support/",
     "defaultPrompt": [
       "Set up Vibooks on this computer and verify it is ready for bookkeeping.",
       "Record the receipts, bills, invoices, and statements in this folder in Vibooks.",

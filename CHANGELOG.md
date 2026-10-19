@@ -4,7 +4,9 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 
 ## [Unreleased]
 
-- Planned next release: `0.5.0`, based on the public `v0.4.1` tag.
+- Planned next release: `0.5.1`, based on the public `v0.5.0` tag: the ChatGPT
+  plugin listing uses the subtitle "AI bookkeeping from documents" and links
+  support at https://vibooks.ai/support/, as the OpenAI directory now requires.
 - Refresh the bundled Vibooks skill (1.3.0): everything can be done through
   the API, and a token acts as its person. Weighty steps need the person's
   reason (and destructive ones the confirmation phrase from their preview);

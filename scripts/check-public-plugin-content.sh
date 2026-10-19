@@ -68,6 +68,7 @@ fi
 
 CANONICAL_DESCRIPTION="Bookkeeping software for AI agents, from source documents to reconciled books."
 MARKETPLACE_DESCRIPTION="Turn source documents into reviewable, reconciled books with Vibooks software."
+CODEX_SUBTITLE="AI bookkeeping from documents"
 for manifest in \
   "${PLUGIN_ROOT}/plugin.json" \
   "${CODEX_ROOT}/.codex-plugin/plugin.json" \
@@ -80,7 +81,7 @@ done
 
 if [[ "$(jq -r '.description' "${PLUGIN_ROOT}/.claude-plugin/marketplace.json")" != "${CANONICAL_DESCRIPTION}" ]] ||
    [[ "$(jq -r '.plugins[0].description' "${PLUGIN_ROOT}/.claude-plugin/marketplace.json")" != "${MARKETPLACE_DESCRIPTION}" ]] ||
-   [[ "$(jq -r '.interface.shortDescription' "${CODEX_ROOT}/.codex-plugin/plugin.json")" != "${MARKETPLACE_DESCRIPTION%.}" ]]; then
+   [[ "$(jq -r '.interface.shortDescription' "${CODEX_ROOT}/.codex-plugin/plugin.json")" != "${CODEX_SUBTITLE}" ]]; then
   echo "Platform marketplace descriptions must use the outcome-led listing copy." >&2
   exit 1
 fi

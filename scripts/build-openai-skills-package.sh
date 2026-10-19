@@ -32,6 +32,17 @@ if [[ "$(jq -r '.mcpServers // empty' "${PACKAGE_ROOT}/.codex-plugin/plugin.json
   exit 1
 fi
 
+SUBTITLE="$(jq -r '.interface.shortDescription // empty' "${PACKAGE_ROOT}/.codex-plugin/plugin.json")"
+SUPPORT_URL="$(jq -r '.interface.supportURL // empty' "${PACKAGE_ROOT}/.codex-plugin/plugin.json")"
+if [[ -z "${SUBTITLE}" ]] || (( ${#SUBTITLE} > 30 )); then
+  echo "OpenAI directory subtitle (interface.shortDescription) must be 1-30 characters: '${SUBTITLE}'." >&2
+  exit 1
+fi
+if [[ ! "${SUPPORT_URL}" =~ ^https:// ]]; then
+  echo "OpenAI directory submission requires an https interface.supportURL." >&2
+  exit 1
+fi
+
 node "${SCRIPT_DIR}/check-png-dimensions.mjs" "${PACKAGE_ROOT}/assets/logo.png" 48 48
 
 for skill in vibooks setup bookkeep-documents reconcile-close review-books; do
