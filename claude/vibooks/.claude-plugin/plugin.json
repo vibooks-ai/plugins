@@ -1,7 +1,7 @@
 {
   "name": "vibooks",
   "displayName": "Vibooks",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Bookkeeping software for AI agents, from source documents to reconciled books.",
   "author": {
     "name": "Block Software Inc.",
