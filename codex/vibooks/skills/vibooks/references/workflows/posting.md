@@ -23,6 +23,18 @@
 - use recurring templates for predictable repeats instead of cloning prior-period
   invoices, bills, or journals by hand
 - post from evidence, not guesses
+- send money in whole minor units of its currency (JPY 0, CAD/USD/EUR 2, KWD
+  3, CLF 4), never finer than the book's posting scale. A finer amount is
+  refused with `AMOUNT_PRECISION_EXCEEDED` (details `currency`,
+  `allowed_decimals`, `received`, `limit`), never rounded; resend the
+  corrected amount. With `limit: book` the book's posting scale is the limit,
+  as for USD cents in a whole-yen book: record whole units or use a book whose
+  posting scale allows cents
+- a line that sends `amount_total` with `quantity` and `unit_price` must have
+  the total equal quantity × unit price rounded to the currency (net of tax in
+  tax-exclusive books, gross in tax-inclusive books; `VALIDATION_FAILED`
+  otherwise). Otherwise leave `amount_total` out; a line read back from an
+  inclusive book carries a net `amount_total`, so do not resend it
 - before editing an existing draft journal or recurring journal template, read
   its full current detail and live update schema. Preserve original currencies,
   exchange rates, source and functional amounts, tax and dimension facts, and
@@ -365,7 +377,10 @@ history, or use a generic journal as the primary invoice correction.
   posted on the wrong date or into the wrong period; do not correct those
   schedule-backed entries with generic entry reverse
 - use `post-v1-books-book-id-recurring-templates-run-due` to catch up missed
-  scheduled work through an `as_of` date
+  scheduled work through an `as_of` date. Templates it could not run (an
+  amount finer than its currency, or a line total that differs from quantity
+  × unit price) are listed under `skipped` with the field and the fix and stay
+  due: edit the template, then run due templates again
 - pause a recurring template when the business event has stopped temporarily;
   patch the schedule when the cadence changed; resume only after the next
   remaining occurrence is correct
@@ -720,6 +735,16 @@ Subledger integrity rules:
   external-payroll workflow. Do not call retired PEI setup, work-fact,
   tip/opening, special preview, or statutory-correction endpoints, relabel an
   unsupported amount, or turn an unknown amount into zero
+- read tasks proactively as in Open Tasks In Each Book in `SKILL.md`: the
+  first time in a conversation that you work in a book (after the connection
+  is ready), again before posting, reconciling or closing there, when you
+  move to a book you have not read yet, after you act on a task, and once a
+  day while a conversation continues. Not before every request, and do not
+  repeat tasks you already reported unless they changed. Read the task
+  fields, not the English `title`; before acting re-read the task
+  (`GET /v1/books/{book_id}/tasks/{task_id}`) and follow its `actions` (a
+  `legacy` task has none: use its review or fix page and the matching
+  workflow in this skill). The rules below cover each kind and family
 - use `/v1/books/{book_id}/tasks` as the shared Overview, Tasks, UI and Agent
   projection for open Payroll work. Preserve the complete versioned task ID,
   re-read its detail immediately before acting, and follow only the returned
@@ -728,6 +753,62 @@ Subledger integrity rules:
   review the replacement; on `TASK_VERIFICATION_REQUIRED`, complete the
   retained rule-impact check; when the task is no longer found, treat it as
   resolved. Count-only Payroll tasks are not dollar exposure
+- `amount_precision_review` (family): stored amounts an earlier version
+  accepted finer than their currency. Read
+  `GET /v1/books/{book_id}/amount-precision-findings`:
+  - `over_precise_amount` with an open residual on an invoice, bill or vendor
+    credit: `:plan` with `account_id` (an income or expense rounding account)
+    and `posting_date` (open period), show the plan, then `:apply` with the
+    same `account_id` and `posting_date`, the `plan_fingerprint` and the
+    person's reason. Apply is a control-account correction
+    (`control_account.correct`); on `light` the reason is enough. On a
+    `standard` or `strict` book, first send the plan's `approval_request`
+    unchanged (`action`, `target_id`, `request_payload`) to
+    `POST /v1/books/{book_id}/approvals` with the person's reason; another
+    person approves it (none of the requester's tokens can), then `:apply`
+    adds its `approval_id`. Never build the payload yourself or reuse a
+    control-account correction preview's payload; a changed `account_id` or
+    `posting_date` at apply is refused with `APPROVAL_PAYLOAD_MISMATCH`.
+    Only the fraction is cleared; the whole part stays due
+    (`remaining_open`). `posts_entry: false` means nothing posts and only the
+    open amount changes, with the reason in the audit log. 409
+    `AMOUNT_PRECISION_PLAN_STALE` (from the approval request or `:apply`)
+    means the open amount changed: show the person `error.current` and
+    request approval for its `approval_request`, since an approval of the
+    earlier plan no longer covers it; 409
+    `AMOUNT_PRECISION_LEDGER_MISMATCH`: review the document with the person or
+    keep the finding with their reason
+  - settled history, a receipt's or payment's fraction, and
+    `fx_rate_possibly_rounded` (compare the rate with the statement):
+    `:acknowledge` with the person's reason (admin scope; nothing posts)
+  - `template_amount_invalid`: edit the recurring template
+  - never send a stored fraction finer than the posting scale as an apply
+    amount; clear it from this review first
+- task `priority` `Critical` and `High` need attention before routine posting
+  or close work, `Due Soon` is the next follow-up and `Housekeeping` is
+  routine; read the detail of any other value before ranking it. `High`
+  marks setup and review tasks such as the book time zone, API access with
+  admin or approver rights or issued by someone else that the person has not
+  confirmed, stored amounts finer than their currency with an
+  open balance, an unconfirmed SIN recovery key, and tax returns an earlier
+  version filed straight to a payment or customer/vendor account (the tax
+  still owed may be understated). `summary.urgent` adds the
+  `count` of every Critical and High task (App 1.5.0 counted only Critical);
+  it mixes accounts, amounts, tokens and books, so it is neither dollar
+  exposure nor a number of tasks. Rank work from the items. Never confirm API
+  access or change a setting just to lower the count; follow each task's own
+  workflow
+- `statutory_identifier_recovery` (family; `kind` `setup`, id
+  `statutory-identifier-recovery:{book_id}`, `High`, `count` 1
+  `affected_books`) stays open while the recovery key of the book's SIN vault
+  is not confirmed off this computer. `recovery_reason` is `unconfirmed`,
+  `confirmed_same_disk` (confirmed but still on this computer) or
+  `received_export` (still protected by the sender's transfer key). Follow
+  Statutory Exports in `references/install-access.md`: ask the person to move
+  the key file off this computer and name it for the recovery key check, or,
+  for `received_export`, offer to replace the transfer key with their own
+  recovery key. It closes only at `recovery_status: confirmed`; it has no
+  dismiss action
 - a task's `amount` is money only when `amount_currency` is present;
   reconciliation-needed, drafts-ready-to-post, validation-errors, period-close
   and refund-review tasks are counted by `count` and their `amount` is
@@ -858,6 +939,12 @@ Subledger integrity rules:
   caller-selected statement semantic: the versioned payroll item owns the
   earning meaning. Phase one ordinary periods require an
   explicit confirmation that there are no paid non-work hours
+- send an agreed pay rate exactly (`22.125`, not `22.13`). The profile
+  `hourly_rate`, `earnings[].rate` and pay-statement earning rates take up to
+  4 decimals, `quantity` (hours, units) on posted earnings, deductions and
+  employer contributions up to 4, and `deductions[].rate` and
+  `employer_contributions[].rate` (fractions such as `0.00602` = 0.602 %) up
+  to 6. More is refused with `VALIDATION_FAILED`, never rounded
 - carry the server-returned statement facts, calculation snapshot and
   fingerprint unchanged into individual or batch post. A missing/mismatched
   fact, unpublished pay-date rule, unsupported earning meaning or incomplete
@@ -879,6 +966,28 @@ Subledger integrity rules:
   exact retained language artifact and strict factual timestamp. This event
   does not assert payment, timeliness or legal qualification. Correct a mistake
   only through the append-only provision-event preview/commit correction APIs
+- `pay_statement_rate_display_notice` (task, Housekeeping): statements drawn
+  up before 1.5.1 can print a rate or hours that differ from the agreed values:
+  payroll-item rates and hours were rounded to two decimals when posted
+  (`$22.13` for an agreed `$22.125`, amount worked out from `22.125`), and a
+  longer rate fact was truncated when printed (`$22.12` for `22.125`).
+  Statements using a profile hourly rate print what was recorded and are not
+  listed. Explain each row from its `reasons` and values; do not call every
+  difference rounding.
+  Read `GET /v1/books/{book_id}/pay-statements/rate-display-notice` and tell
+  the person, per row (`affected`: employee, pay date, earning), the printed
+  and agreed rate and hours (`printed_rate`/`agreed_rate`,
+  `printed_hours`/`agreed_hours`) and `reasons`. Say the amount is correct
+  only when `agreed_values_give_amount` is true; when false, say the recorded
+  rate and hours don't give the amount and ask them to check the payroll
+  record; when null (a periodic salary or a row without hours), make no claim
+  about the amount.
+  Acknowledge (`POST …/pay-statements/rate-display-notice:acknowledge`
+  `{set_digest, reason}`, `post` scope) only with the person's own reason;
+  `409 PAY_STATEMENT_NOTICE_STALE` means the list changed: read it again;
+  `409 PAY_STATEMENT_NOTICE_NOT_OPEN` means nothing is left to acknowledge. A
+  new statement in an affected lineage brings the task back. Never reissue or
+  edit a statement
 - Québec statement language is French unless an effective employee English
   request exists. UI language is irrelevant. Use shared English/French branded
   templates with the one protected statement-content slot; never hide or
@@ -949,10 +1058,12 @@ Subledger integrity rules:
   validation operations, then, with the person's go-ahead and the preview's
   phrase, start the `statutory.export` host request for the retained intent
   (see Statutory Exports in `references/install-access.md`); the desktop app
-  takes sensitive identifiers and saves natively. Give the person the
-  returned path; never open, read, upload or quote the exported file. Full SINs, RP accounts and
-  transmitter identifiers belong only in the desktop prompt, never an API,
-  agent message, log or ordinary evidence field. One CRA XML return has one
+  writes the file from the SINs and numbers stored in the book, encrypted,
+  after a coverage read shows them stored and unlocked here. Give the person
+  the returned path; never open, read, upload or quote the exported file.
+  Full SINs, RP accounts and transmitter identifiers are entered only by the
+  person in Vibooks or through a file they name, never in an API field, agent
+  message, log or ordinary evidence field. One CRA XML return has one
   RP account and a reviewed slip selection; changes, cancellations and
   additional originals retain their prior-filed lineage. Record CRA upload,
   processing and employee distribution only as user-provided external evidence,
@@ -1009,12 +1120,15 @@ Subledger integrity rules:
   `customer_export_ready` is false, do not construct or claim a `.BLK` file;
   retain the non-official review report and complete the record in ROE Web.
   When ready, start the `statutory.export` host request for a retained intent
-  with the person's go-ahead and the preview's phrase; the desktop app asks
-  the person for the full SIN and RP account locally and saves the draft. Give
+  with the person's go-ahead and the preview's phrase; the desktop app writes
+  the draft from the SIN and RP account stored in the book. Give
   the person the returned path; never open, read, upload or quote the file.
   For employment spanning pay-date years, review each year's retained payroll
   generation sources and current RP account assignments before creating the
   native intent. The T4 annual-facts review remains limited to 2026.
+  An ROE `due_date` is a calendar date, never moved for a weekend or holiday:
+  advise issuing by the date shown (the ROE review task and worksheet give
+  `due_date_weekday`).
   ROE Web upload, review and issue remain separate user actions; record any
   external outcome as user-provided evidence with correction history. Only an
   explicit `issued` result or active legacy external-completion record closes
@@ -1152,6 +1266,16 @@ Subledger integrity rules:
   For an NT target correction, instead reassess the current reference period
   through its correction preview; the retained source and correction history
   determines whether any additional amount remains
+- every vacation-pay call sends your token and needs the scope the discovery
+  contract lists for it: `read` for setup, fact lists, a calculation and the
+  report; `draft_write` for previews and for recording service, policy,
+  compensation, entitlement and absence facts; `post` for every post-* step
+  and reversal; `admin` for the account setup, payment arrangements and
+  profiles. Changing the vacation-pay payable account while vacation pay is
+  owed also posts a transfer and needs `post`. On `UNAUTHORIZED` (no valid
+  token) or `403 FORBIDDEN` "<scope> scope is required", stop and ask the
+  person for access with that scope; never retry through another route or a
+  generic journal
 - if posting returns `VACATION_STRICT_APPROVAL_UNSUPPORTED`, stop and explain
   that vacation posting is unavailable while the book requires separate strict
   approvals. Do not change `approved_by`, retry, or recreate the result through
@@ -1395,8 +1519,10 @@ activity or a later run covers it.
   authority, prefer `bank-deposits` with the settlement account as the source
   line
 - tax return preparation: prefer `tax-returns`; filing moves the reported tax
-  out of the tax accounts into the chosen settlement account (see Tax Returns
-  in `references/workflows/verification.md`)
+  out of the tax accounts into the settlement liability (the `recommended`
+  row of `tax-returns:settlementAccounts`, never a bank, card or
+  customer/vendor account); record the payment separately on its own date
+  (see Tax Returns in `references/workflows/verification.md`)
 - debit-card purchase: prefer `expense`; economically it debits expense,
   prepaid, inventory, fixed asset, liability settlement, or equity draw lines
   and credits bank

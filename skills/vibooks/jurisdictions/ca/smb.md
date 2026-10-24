@@ -408,11 +408,27 @@ first-class `payroll-tax-form-adjustments` resource and reverse an incorrect
 adjustment through its reversal action; never rewrite a posted payroll snapshot
 or YTD history to force a slip total.
 
+In January, read `GET /v1/books/{book_id}/payroll/year-end/obligations` and
+tell the person each T4 and RL-1 due date (calendar dates from installed
+calendars; `due_date_reason` explains a date that differs from the statutory
+one). Record CRA upload evidence for T4 files Vibooks produced through
+`/v1/books/{book_id}/statutory-export-intents/{intentId}/external-evidence`
+(`action_kind: cra_return_submission`). Use
+`…/year-end/obligations/{obligationId}:acknowledge` (`handled_on`, `method`
+`filed_outside_vibooks`, `payroll_provider` or `not_required`, optional
+`reference`, `reason`) only for what the person tells you was done outside
+Vibooks, with their words as `reason`; `:retractAcknowledgement` undoes it.
+`evidence_recorded` and an acknowledgement never mean filed or accepted:
+describe an obligation that way only when authority evidence says so.
+
 Check `/v1/statutory-export-packages` separately for `t4_employee_copies`
 and `t4_cra_return_xml`. When the 2026 employee-copy PDF package is ready and
 the reviewed slip facts are complete, create the discovered PDF intent and let
-the desktop app collect the SIN or reviewed missing-SIN disposition and save
-the employee copies. Do not synthesize a T4 PDF or substitute another year's
+the desktop app save the employee copies from the SINs stored in the book,
+encrypted (check `payroll/statutory-identifier-coverage` first; see
+Statutory Exports in `references/install-access.md`). A reviewed missing-SIN
+disposition (`not_obtained_evidence_required`) is completed by the person in
+the desktop app. Do not synthesize a T4 PDF or substitute another year's
 form. Save one complete employee/province slip group per PDF intent. A cancelled
 draft can start a new original only if no save was reserved. A reservation
 means the file may exist even if the local outcome is unknown; after a

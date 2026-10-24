@@ -4,9 +4,37 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 
 ## [Unreleased]
 
-- Planned next release: `0.5.1`, based on the public `v0.5.0` tag: the ChatGPT
-  plugin listing uses the subtitle "AI bookkeeping from documents" and links
-  support at https://vibooks.ai/support/, as the OpenAI directory now requires.
+- Planned next release: `0.6.0`, based on the public `v0.5.1` tag.
+- Refresh the bundled Vibooks skill (1.4.0) to match Vibooks 1.5.1. Use
+  `vibooks-cli` 1.4.0 or later.
+- Canadian payroll: employee SINs are kept in the book, encrypted, with a
+  SIN vault and a recovery key, so T4 and ROE exports never prompt for a SIN.
+  Pay statements drawn up before Vibooks 1.5.1 that print a rate or hours
+  different from the agreed values are listed in a notice, explained row by
+  row.
+- API access: the person reviews the access listed for their book, revokes
+  what they do not recognise and confirms the rest. When data was saved by a
+  newer Vibooks, the agent tells the person to update Vibooks and changes
+  nothing.
+- Amounts are sent in whole units of their currency's precision; a finer
+  amount is refused rather than rounded, and precision corrections on
+  Standard and Strict books need approval. Book imports keep the source
+  book's approval level unless the person says otherwise.
+- Filing a tax return moves the tax into a settlement liability; returns an
+  earlier version filed straight to a payment account appear as a High task.
+- Agents read each book's open tasks at the first work in that book, before
+  posting, reconciling or closing, and after switching books.
+- Name the `vibooks-cli` 1.4.0 commands for access confirmation, agent
+  enrollment confirmation, refused data and book time zones.
+
+## [0.5.1] - 2026-10-19
+
+- The ChatGPT plugin listing uses the subtitle "AI bookkeeping from documents"
+  and links support at https://vibooks.ai/support/, as the OpenAI directory
+  now requires.
+
+## [0.5.0] - 2026-10-12
+
 - Refresh the bundled Vibooks skill (1.3.0): everything can be done through
   the API, and a token acts as its person. Weighty steps need the person's
   reason (and destructive ones the confirmation phrase from their preview);

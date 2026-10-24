@@ -168,6 +168,25 @@ attachment files. Portable whole-book export/import and backup/restore retain
 their separate module requirements. Check live discovery on the connected app;
 an older app may require an upgrade to provide report-based package access.
 
+When importing a book, first read `approval_level` in
+`POST /api/admin/import-book:preview` (`source`, `planned`,
+`lowering_requires`). Keep the source book's level unless the person says
+otherwise: leave `approval_level` out of `POST /api/admin/import-book`.
+Raising it is routine. Importing below the source level needs the person's
+own approver authority and their `reason`; it is refused with `409
+BOOK_IMPORT_APPROVAL_LEVEL_LOWERING_NEEDS_APPROVAL` when another approver
+exists. Then import at the source level and lower the new book through
+`PATCH /v1/books/{book_id}/settings` (`approval_level`, `approval_id`) with
+that approver's approved `book.lower_approval_level` request
+(`error.next_action_details.route_sequence`). A bundle from Vibooks 1.5.0 or
+earlier records no level (`source: null`, warning
+`SOURCE_APPROVAL_LEVEL_NOT_RECORDED`) and the copy starts at Light: ask the
+person which level the original used. Bundles are not signed, so the recorded
+level is only what the export wrote. A bundle from a newer Vibooks is refused
+with `409 BUNDLE_NEWER_THAN_APP` before anything is written: update Vibooks,
+then import again. Vibooks 1.5.0 and earlier cannot import a 1.5.1 export
+(`INVALID_BUNDLE`).
+
 ## Tax Returns
 
 Use `tax-returns` as the first-class filing workflow. Do not treat tax filing
@@ -207,11 +226,37 @@ Rules:
   settles
 - filing moves the reported tax out of the payable and recoverable tax
   accounts into the settlement account (`offset_account_id`), which then holds
-  the net owing to or refundable from the authority. Use a dedicated
-  balance-sheet clearing or settlement account: a tax account is refused
-  (`TAX_POSTING_OFFSET_INVALID`), an income-statement account is warned, and a
-  bank statement account is wrong. Record the payment or refund itself as a
-  separate entry against that account
+  the net owing to or refundable from the authority. Filing records what is
+  owed, not the payment: a tax account, and a bank, card, cash, receivable,
+  payable, customer-deposit or vendor-advance account, are refused (`400
+  TAX_POSTING_OFFSET_INVALID`, detail `account_kind` for the latter); an
+  income-statement account is warned. Read
+  `GET /v1/books/{book_id}/tax-returns:settlementAccounts` and use the row
+  marked `recommended: true`, or ask the person. If none is recommended, run
+  its `reactivate_account` call or create the account its `create_account`
+  body describes (GST/HST Owing; GST/QST Owing in a Québec book; 未払消費税等
+  (Consumption Tax Owing) in Japan) with `POST /v1/books/{book_id}/accounts`
+- record the payment or refund on the day it happens (an expense, payment or
+  bank-line `:create-entry` whose line is that liability) and match the
+  statement line to it
+- `:refresh` accepts `offset_account_id` to change the settlement account of a
+  draft or reversed return
+- `tax_return_cash_settlement_review` (task, `High`: the tax still owed may be
+  understated): returns an earlier version filed straight to a payment or
+  customer/vendor account. Ask the person whether
+  the tax was paid (or refunded) on the filing's posting date for that amount.
+  If yes, `POST /v1/books/{book_id}/tax-returns/{id}:acknowledgeCashSettlement`
+  with their `reason`. If not, reverse the filing entry
+  (`entries/{filing_entry_id}:reverse`) in an open period, `:refresh` with an
+  eligible `offset_account_id`, `:file` again with the original
+  `filing_date`, a `posting_date` in an open period and the person's reason,
+  then record the real payment
+- a return read names its journal entries in `generated_entries`
+  (`[{id, entry_no, document_number}]`, in `generated_entry_ids` order). Name
+  an entry to the person by `document_number`, else `entry_no`, never by id.
+  An id with no matching entry is left out: treat it as a finding and read
+  `GET /v1/books/{book_id}/entries/{id}`. Verify amounts from the entry
+  itself
 - on `TAX_RETURN_DRAFT_STALE`, compare the stored figures with `error.current`,
   call `tax-returns/{id}:refresh`, review the new figures with the person, then
   file

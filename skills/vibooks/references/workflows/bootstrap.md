@@ -249,8 +249,13 @@ vibooks-cli books bootstrap \
   --fiscal-year-start 2026-01-01 \
   --fiscal-year-end 2026-12-31 \
   --currency USD \
-  --tax-mode none
+  --tax-mode none \
+  --time-zone America/New_York
 ```
+
+`--time-zone` (vibooks-cli 1.4.0 or later) takes the IANA zone the person
+confirmed; with an older CLI, set `time_zone` as in The Book's Time Zone and
+Today in `references/install-access.md`.
 
 Canada example:
 
