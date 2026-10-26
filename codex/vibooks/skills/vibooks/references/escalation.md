@@ -23,7 +23,8 @@ If the owner wants to keep data:
   `%LOCALAPPDATA%/Programs/Vibooks`, but keep `%APPDATA%/ai.vibooks.desktop`
   and `%APPDATA%/vibooks`
 - on Linux headless, stop and disable `systemctl --user stop vibooks` and
-  `systemctl --user disable vibooks`, remove `~/.local/bin/vibooks-core` and
+  `systemctl --user disable vibooks`, remove `~/.local/bin/vibooks-core`,
+  `~/.local/bin/vibooks-statutory-host` and
   `~/.config/systemd/user/vibooks.service`, but keep
   `${XDG_DATA_HOME:-~/.local/share}/vibooks` and
   `${XDG_CONFIG_HOME:-~/.config}/vibooks`

@@ -4,7 +4,30 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 
 ## [Unreleased]
 
-- Planned next release: `0.6.0`, based on the public `v0.5.1` tag.
+- Planned next release: `0.7.0`, based on the public `v0.6.0` tag.
+- Refresh the bundled Vibooks skill (1.5.0) to match Vibooks 1.5.2. Use
+  `vibooks-cli` 1.4.0 or later.
+- Canadian payroll on Linux: Vibooks runs its own helper for the SIN vault and
+  for T4 and ROE files, so headless installs no longer need the desktop app.
+  The agent explains where the key is kept and never reads key files.
+- Employees who have not given their SIN: the T4 is still filed on time with
+  zeros in box 12, each request for the SIN is logged, and once the SIN is
+  given the agent walks the person through the follow-up (amended T4, filing
+  and corrected employee copies). An ROE waits for the SIN.
+- Pay statements print amounts in the statement's own language form (for
+  example `1 435,28 $` in French) and agents quote them as printed.
+  Supplementary pay-statement facts are plain decimal numbers.
+- An API token's secret is shown only once; a lost secret means a new token.
+- Receivables and payables: amounts collected without a matching invoice or
+  bill must fit what is still owed, inactive customers and vendors take no new
+  documents, and corrections stay in their own open period. Documents an
+  earlier version accepted but that are now refused appear as a Housekeeping
+  task, explained one by one.
+- Tax-code corrections of posted documents are refused in a closed period or
+  a filed tax return; a credit note and a corrected document are used instead.
+
+## [0.6.0] - 2026-10-24
+
 - Refresh the bundled Vibooks skill (1.4.0) to match Vibooks 1.5.1. Use
   `vibooks-cli` 1.4.0 or later.
 - Canadian payroll: employee SINs are kept in the book, encrypted, with a

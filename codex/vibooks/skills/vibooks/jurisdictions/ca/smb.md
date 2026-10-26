@@ -225,10 +225,28 @@ For an ordinary supported pay period:
 4. pass the typed `pay_statement_facts` through calculation preview and carry
    the server-returned draft and fingerprint unchanged into run or batch post
    (`salary_hours_worked` is supplied only for a salary profile; earning meaning
-   always comes from the server's versioned payroll item and is never caller-set)
+   always comes from the server's versioned payroll item and is never caller-set).
+   Supplementary facts (overtime-in-lieu hours taken, time-bank amount taken and
+   balance remaining, statutory-holiday paid hours, Ontario deemed room and
+   board, Québec overtime hours replaced by leave and the leave premium) are
+   plain decimal text such as `125.00`: digits, at most one point and four
+   decimals, no sign, spaces or thousands separators. Anything else is refused
+   with `VALIDATION_FAILED` on `pay_statement_facts.<name>` by the post (the
+   preview passes them through unchecked); correct the value from the source
+   record and preview again, never reformat it by guess
 5. after post, read the statement through its payroll-run link or list API;
    render the retained PDF/HTML or export the batch ZIP without marking it as
-   delivered
+   delivered. Amounts on a statement follow its `printed_number_form`
+   (`en-CA` prints `$1,435.28`; `fr-CA` prints `1 435,28 $`, with a no-break
+   space between thousands and before `$`, and a decimal comma for hours such
+   as `37,5`). Quote amounts and the rate text in `printed_earning_rates` as
+   printed; never re-format or round them yourself. Each `artifacts` entry
+   carries the form of its own language, so the English copy of a Québec
+   statement prints `en-CA` with the same values. Statements first drawn up
+   before App 1.5.2, with their corrections and reversals, print English form
+   in both languages and are not reissued for that. `printed_number_form` is
+   `null` only when this version does not know the statement's package and
+   renderer
 6. for every supported Canadian jurisdiction, read the statement's
    server-derived `paper_handoff` projection before acting; `not_recorded` means
    only that no current paper-delivery fact exists and never means the cash wage
@@ -426,9 +444,9 @@ and `t4_cra_return_xml`. When the 2026 employee-copy PDF package is ready and
 the reviewed slip facts are complete, create the discovered PDF intent and let
 the desktop app save the employee copies from the SINs stored in the book,
 encrypted (check `payroll/statutory-identifier-coverage` first; see
-Statutory Exports in `references/install-access.md`). A reviewed missing-SIN
-disposition (`not_obtained_evidence_required`) is completed by the person in
-the desktop app. Do not synthesize a T4 PDF or substitute another year's
+Statutory Exports in `references/install-access.md`). An employee who has not
+given their SIN is recorded that way (Employees Who Have Not Given Their SIN,
+below); their T4 then shows 000000000 in box 12. Do not synthesize a T4 PDF or substitute another year's
 form. Save one complete employee/province slip group per PDF intent. A cancelled
 draft can start a new original only if no save was reserved. A reservation
 means the file may exist even if the local outcome is unknown; after a
@@ -448,6 +466,48 @@ until a final package for its intended 2027 processing window is separately
 verified. Do not describe a preview, saved PDF or XML as CRA accepted, or mark
 the year complete merely because totals balance. The verified RL-1 filing
 package remains unavailable.
+
+### Employees Who Have Not Given Their SIN
+
+CRA still requires the T4 on time: box 12 shows 000000000 for an employee who
+has not given their SIN, and the employer must show reasonable efforts to get
+it (dated requests) and tell Service Canada within 6 days of the start of
+work. Deductions and remittances are unchanged. An ROE cannot be submitted
+without the SIN.
+
+1. when the person says an employee has not given their SIN, create the
+   identity with `sin_status: "not_obtained"` and `sin_request:
+   {requested_on, reference, service_canada_informed_on?}` (the date they
+   asked, a word-only note of where the request record is kept, never a
+   number that could be a SIN); never send `sin_last_four` then
+2. log later requests or the Service Canada date as the person reports them:
+   `POST /v1/books/{book_id}/employees/{employee_id}/sin-request-efforts`
+   `{kind: "request" | "service_canada_informed", occurred_on, reference}`
+   (`reference`, in words, is required for a request);
+   relay the T4 preview notice `T4_EMPLOYEE_SIN_NOT_OBTAINED` (it never
+   blocks the T4)
+3. the T4 export confirmation names the employee and the zeros; relay it in
+   full. `ROE_EMPLOYEE_SIN_NOT_OBTAINED`: relay its steps and the Employer
+   Contact Centre advice; do not prepare the ROE
+4. when the employee gives the SIN, the person gives only its last four in
+   chat: call `…/payroll-identities:record-sin` `{sin_last_four,
+   sin_secret_ref: "vault://vibooks/statutory-identifiers"}` with their
+   go-ahead, then have the full SIN stored (Statutory Exports step 3 in
+   `references/install-access.md`). A mistaken last four can be corrected the
+   same way only until the SIN is stored or a new intent is prepared
+   (`PAYROLL_IDENTITY_SIN_RECORDING_FINAL` otherwise)
+5. relay `follow_up` group by group and act only with the person:
+   `cra_amendment` (prepare the `amended` T4 XML with the listed
+   `prior_filed_intent_id` and `predecessor_intent_id`), `amendment_to_file`
+   (file the amendment already prepared), `cra_result_to_record` (record CRA's
+   result first), `unfiled_xml_to_replace` (ask whether that file was filed:
+   if so, record the submission and CRA's result; if not, never file it and
+   prepare a new T4 XML with the SIN), `cra_amendment_outside_vibooks` (the
+   person amends with CRA directly, then record it with
+   `POST …/employees/{employee_id}/sin-follow-up/external-amendments`) and
+   `employee_copies` (the corrected employee copy with its `report_type`).
+   Re-read `GET …/employees/{employee_id}/sin-follow-up` after each step
+   until `open` is `false`
 
 For ROE, use the discovered preparation options and retained non-official review
 report. Attempt a Payroll Extract `.BLK` only when the live contract explicitly

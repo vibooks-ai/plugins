@@ -401,7 +401,9 @@ forward-date work: send explicit dates for every action (see Date Rules in
    - immediately convert that bootstrap credential into a saved API token with
      `vibooks-cli auth enroll-agent` (see Preferred Token Model)
    - the headless service is the Core only (no app): the person gives their
-     go-ahead in chat, and operations that need the desktop app answer
+     go-ahead in chat; the SIN and T4/ROE file requests run through the
+     statutory helper Vibooks starts (Linux under Statutory Exports), and
+     other operations that need the desktop app answer
      `409 HOST_UNAVAILABLE` (see Approvals below)
 3. human-driven desktop initialization:
    - the owner can create an API token from Vibooks `API Tokens` settings or
@@ -448,7 +450,15 @@ forward-date work: send explicit dates for every action (see Date Rules in
    current session environment once from the saved API token and keep using that
    shell session
 4. let `vibooks-cli` auto-discover that saved API token in later sessions
-5. revoke unused or replaced tokens
+5. revoke unused or replaced tokens. A token's secret is shown only once, in
+   the response that created it; Vibooks keeps only a fingerprint and cannot
+   show it again. A lost secret means creating a new token and revoking the
+   old one. Repeating `POST /api/settings/tokens` with the same
+   `Idempotency-Key` (a retry after a lost response) issues a new token with
+   a new secret and revokes the earlier one when the same credential created
+   it; save the secret from the latest response. If a Vibooks 1.5.1 or
+   earlier backup, or a `migration-backups` copy, may have been seen by
+   someone else, revoke the affected access and connect the agent again
 6. a principal ID gets a new token only from its own principal or from the
    principal that issued every earlier token for it, revoked ones included
    (the local setup credential can always re-create the person's own
@@ -557,7 +567,8 @@ applying payments, imports, previews, reads and setup.
 - a call that carries the `approval_id` of an approved request is confirmed by
   that approval. After an unclear outcome, resend it with the same
   `Idempotency-Key` and body: an exact replay returns the stored result,
-  whatever `X-Request-Id` it carries
+  whatever `X-Request-Id` it carries (token creation is the exception: it
+  issues a new token, see Preferred Token Model)
 - 400 `CONFIRMATION_REQUIRED` means nothing was written: ask, then resend with
   the reason (and phrase); 409 `CONFIRMATION_STALE` means the data changed
   since the preview: show the fresh preview and ask again
@@ -719,7 +730,8 @@ Employee SINs, CRA payroll account numbers and the transmitter number are
 entered once and stored in the book, encrypted. The keys stay in this
 computer's keychain, and a recovery key file the person keeps opens them
 anywhere else. T4 and ROE files are written by the desktop app (macOS or
-Windows) from those stored values, so an export never prompts for a SIN.
+Windows), or on Linux by the Vibooks statutory helper (see Linux below), from
+those stored values, so an export never prompts for a SIN.
 
 Secrets rule: never ask for, repeat or accept in chat a SIN, payroll account
 number, or recovery or transfer key; the last four digits are fine. Never
@@ -733,11 +745,12 @@ their words as `reason`, and the `confirmation_phrase` only when their reply
 contains it), then follow `GET /api/host/requests/{id}`. Host requests need
 the admin scope and approver authority (the SIN kinds also the payroll
 module), and the desktop app running on this
-computer (`409 HOST_UNAVAILABLE` otherwise; on Linux
-`STATUTORY_EXPORT_PLATFORM_UNSUPPORTED`). From chat, setup, replace, unlock,
+computer, or on Linux the statutory helper (`409 HOST_UNAVAILABLE`
+otherwise). From chat, setup, replace, unlock,
 check, import and the book export with SINs each need a file or folder the
 person names (`STATUTORY_NEEDS_FILE_IN_CHAT` otherwise); without one, the
-person uses the Vibooks app on that computer. Requests expire after ten
+person uses the Vibooks app on that computer; on Linux there is no app
+window, so a file or folder is always needed. Requests expire after ten
 minutes. Arguments are refused by the preview or create call (HTTP 400 or
 409, for example `STATUTORY_NEEDS_FILE_IN_CHAT` or `HOST_UNAVAILABLE`); once
 the desktop app runs the request, failures arrive as `result.error` or
@@ -753,7 +766,9 @@ the desktop app runs the request, failures arrive as `result.error` or
      app has not reported)
    - each employee and T4 proprietor (`sin`) and CRA payroll account
      (`number`) is `stored`, `missing` or `last_four_changed` (enter it
-     again); an employee with no SIN last four on file is `not_obtained`; the
+     again); an employee who has not given their SIN is `not_obtained`
+     (record the SIN once given), one with no legal identity yet is
+     `no_identity`; the
      transmitter (`status`) is `stored` or `missing`. `keep_until_year` is the
      last year CRA still requires the record (six years after the last
      payroll year, T4001)
@@ -775,7 +790,8 @@ the desktop app runs the request, failures arrive as `result.error` or
    `proprietor:{T4 proprietor display name}` or
    `payroll_account:{authority_account_id}`; the person prepares it. The
    result is counts only (`new`, `replaced`, `unchanged`, `refused` with role
-   and `reason_code`) and `file_deleted`; relay `advice`, any
+   and `reason_code`; `sin_not_recorded`: record the SIN's last four first,
+   `no_identity`: add the legal identity first) and `file_deleted`; relay `advice`, any
    `file_delete_skipped` (`rows_refused`, `other_links_exist`,
    `file_changed`) and the warning `file_owned_by_administrators`. A row
    refused with `different_value_saved` is replaced only by a new request with
@@ -825,8 +841,9 @@ the desktop app runs the request, failures arrive as `result.error` or
      computer may be able to open files in this folder")
    - `STATUTORY_IDENTIFIERS_MISSING`: nothing was written; name the missing
      records by `display_label` and `reason` (`not_stored`,
-     `last_four_changed`) and how to enter them (step 3);
-     `not_obtained_evidence_required` only the person can complete in the app
+     `last_four_changed`) and how to enter them (step 3). An employee who
+     has not given their SIN is never missing: their T4 shows 000000000
+     (see the Canadian profile)
    - `STATUTORY_IDENTIFIERS_LOCKED`: unlock first (step 4)
    - `STATUTORY_FOLDER_UNSAFE` (not a plain folder of the person's own, or
      others can change files there) or
@@ -852,6 +869,51 @@ the desktop app runs the request, failures arrive as `result.error` or
     authority: relay the summary and, within the retention period, the CRA
     six-year warning; send the reason and phrase only when the person gives
     them
+
+### Linux (headless)
+
+On Linux, Vibooks runs headless and starts its own statutory helper, which
+carries out the same host requests; no keyring service is needed. Coverage
+shows `statutory_host: "helper"` and `key_store` (`computer` or `memory`).
+
+- `HOST_UNAVAILABLE`: relay `next_action_details` (the helper is starting,
+  not installed, the wrong version, keeps stopping or is turned off) and its
+  advice: retry,
+  run the Vibooks installer again, or `systemctl --user restart vibooks`, run
+  only when the person asks
+- before setup, unlock or replace, relay where the summary says the key will
+  be kept; afterwards relay `kept`: `on_this_computer`, or
+  `until_vibooks_restarts` with `kept_advice` (unlock again with the recovery
+  key file after Vibooks restarts)
+- at setup, say once in plain words: the key is kept in a private file in the
+  person's Vibooks settings folder so exports work without asking; programs
+  running under their account, including your own commands, can read it, as
+  on Windows; a copy of that folder alone cannot open the SINs, but a backup
+  or snapshot of the whole computer, a disk image or the disk itself can,
+  unless encrypted. Suggest disk encryption and encrypted backups, or locking
+  the SINs after exporting
+- never read, list, copy or open
+  `${XDG_CONFIG_HOME:-~/.config}/vibooks/statutory-keys`, `/etc/machine-id`,
+  an import, recovery or transfer key file, or an exported file, and never
+  print, copy or show the contents of `vibooks-headless.env` (loading it only
+  to start `vibooks-core`, Startup step 4, is allowed), even though your shell
+  could
+- T4 and ROE files and book exports with SINs go to a folder on the
+  computer's own disk: on `STATUTORY_FOLDER_NOT_PRIVATE` (a USB key or drive
+  that keeps no permissions) or `STATUTORY_FOLDER_NOT_LOCAL` (a network,
+  shared or unsupported drive) ask for another folder. Recovery and transfer
+  key files may go on the person's own USB key (relay
+  `key_on_medium_without_permissions`)
+- a recovery key kept only on paper or in a password manager: ask the person
+  to save a text file with the line `Recovery key: XXXX-…` on a USB key, name
+  it for unlock or check, and delete it afterwards; never ask them to type it
+  into chat
+- `STATUTORY_KEY_STORE_UNSAFE`: other accounts can open the person's Vibooks
+  key folder; relay the `chmod 700` advice and change permissions only if the
+  person asks
+- `STATUTORY_HELPER_STOPPED` with `outcome_unknown: true`: Vibooks stopped
+  while writing; do not retry until the person has looked in the folder. A
+  retry never overwrites a file
 
 The vault's state also appears as the `statutory_identifier_recovery` task
 until a fresh coverage or task read shows `recovery_status: confirmed` (see

@@ -86,7 +86,15 @@ Rules:
   `tax_override_reason` so Vibooks can preserve the already-posted tax amount
   with `tax_amount_override`
 - this workflow updates tax metadata with audit history; it does not reopen
-  applied receipts or payments and it does not change the posted gross amount
+  applied receipts or payments and it does not change the posted gross amount.
+  The document's own lines and its ledger lines are retagged together
+- it is refused when the document's posting date is in a closed period
+  (`PERIOD_CLOSED` / `PERIOD_SOFT_CLOSED`) or inside a filed tax return
+  (`TAX_RETURN_FILED`): reported tax is final there, so correct it with a
+  credit note (vendor credit) and a corrected invoice (bill) in an open period
+- when the task list shows `DOCUMENT_TAX_CODE_DIFFERS_FROM_LEDGER`, follow the
+  `document_consistency_review` steps in `references/workflows/posting.md`:
+  that resync posts nothing and is allowed in any period
 - if the tax amount itself was substantively wrong and should no longer remain
   on the books, do not use `replace-tax-code`; use the normal corrective
   document flow instead

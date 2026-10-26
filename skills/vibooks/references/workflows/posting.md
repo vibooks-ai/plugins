@@ -232,6 +232,27 @@ Choose the first-class sale before preparing lines:
   receipt (payment) date: it is refused (`RECEIPT_PREAPPLIED_INVOICES_REQUIRED`,
   `PAYMENT_PREAPPLIED_BILLS_REQUIRED`). `unapplied_amount`, if sent, must equal
   `amount_total` less the applications
+- without `applications`, a pre-applied amount collects an opening balance:
+  the receivables (payables) account must still hold at least that amount in
+  that currency on the date beyond what open invoices (bills) account for, or
+  it is refused (`RECEIPT_PREAPPLIED_EXCEEDS_RECEIVABLE`,
+  `PAYMENT_PREAPPLIED_EXCEEDS_PAYABLE`). Money for which nothing is owed is a
+  customer deposit (vendor advance): record it unapplied instead
+- leave `status` out on receipt and payment create; it follows the amounts and
+  a contradicting value is refused (`STATUS_CONFLICTS_WITH_AMOUNTS`)
+- name a receipt's `deposit_account` (a payment's `funding_account`) only with
+  an existing account; an unknown reference is refused (`ACCOUNT_NOT_FOUND`)
+  and never falls back to Operating Cash
+- on any document in the book's own currency send `exchange_rate` 1 or leave
+  it out; any other rate is refused (`FUNCTIONAL_CURRENCY_RATE_NOT_ONE`)
+- on `:unapply` of a receipt, payment or vendor credit, the lines naming one
+  invoice or bill together may not exceed what was applied to it
+- receipt list `filters` accept `status`, `application` (`unapplied` or
+  `fully_applied`), `customer` and `bank_account` with `is` / `is_not`;
+  `receipt_date` with `on`, `before`, `after`, `between` (YYYY-MM-DD,
+  `between` needs `value_to`); `amount` with `eq`, `gt`, `gte`, `lt`, `lte`,
+  `between`. Anything else is refused with `VALIDATION_FAILED` (field
+  `filters`); fix the filter instead of reading every receipt
 - when cash arrives before an invoice or before revenue is earned, first record
   it as unapplied customer cash in the customer-deposit liability, then choose
   exactly one of the supported prepayment paths described below
@@ -246,7 +267,21 @@ Reuse or create the customer deliberately:
 - create a customer only when source evidence or confirmed user instruction
   establishes a new party
 - use the supported customer merge workflow for confirmed duplicate masters;
-  never rewrite invoice or receipt history manually
+  never rewrite invoice or receipt history manually. A merge moves every
+  document of the duplicate (invoices, receipts, sales receipts, customer
+  refunds; for vendors bills, payments, expenses, purchase receipts, vendor
+  credits, vendor refunds) to the surviving master, which must be active
+- an inactive or archived customer (vendor) takes no new documents or
+  recurring templates (`CUSTOMER_INACTIVE` / `VENDOR_INACTIVE`, field
+  `customer_id` / `vendor_id`). If the source evidence is a new transaction
+  with that party, confirm with the user, make the master active again, record
+  the document, and return it to inactive only if asked. Corrections of its
+  existing documents need no reactivation
+- a customer with open invoices or receipts with an unapplied amount (a vendor
+  with open bills, or payments or vendor credits with an unapplied amount)
+  cannot be made inactive or archived (`CUSTOMER_HAS_OPEN_BALANCE` /
+  `VENDOR_HAS_OPEN_BALANCE`); settle, credit or refund the open items first.
+  Never write them off just to archive the master
 
 Decide whether the line needs an Item:
 
@@ -344,12 +379,25 @@ conflict. To return the receipt to its ordinary lifecycle:
    the resulting deposit, AR, revenue, and GL balances
 
 Obtain the normal authorization for every mutation. For invoice corrections,
-use void only before allocations, reopen a valid void when supported, replace
+use void only before allocations, reopen a valid void when supported (the
+reopen date cannot be before the void date: `REOPEN_DATE_BEFORE_VOID`), replace
 a structurally wrong posted invoice through `:replace`, use
-`:replace-tax-code` for a tax-code-only correction, issue a credit note for a
-valid reduction of the remaining receivable, and use attachment actions when
-only evidence links changed. Never hard-delete, silently rewrite posted
-history, or use a generic journal as the primary invoice correction.
+`:replace-tax-code` for a tax-code-only correction in an open period (see
+Posted Tax-Code Corrections in `references/workflows/verification.md`), issue
+a credit note for a valid reduction of the remaining receivable, and use
+attachment actions when only evidence links changed (removing evidence
+requires a `reason`, kept in the audit log). Never hard-delete, silently
+rewrite posted history, or use a generic journal as the primary invoice
+correction.
+
+- send the credit note's own date; omitted, it is the book's today (or the
+  invoice issue date when that is later), never the invoice date
+- a `:replace` of an invoice, bill or other document corrects it in its own
+  period: leave `posting_date` out (it is the later of the document's issue
+  date and the original entry's posting date) unless the user wants a later
+  correction date. If that period is closed, the replace is refused
+  (`PERIOD_CLOSED`); for an invoice or bill use a credit note or vendor
+  credit in an open period instead of re-dating the document
 
 ## Recurring Bookkeeping
 
@@ -360,6 +408,9 @@ history, or use a generic journal as the primary invoice correction.
   receipt should become deferred revenue
 - create `payment:create-recognition-schedule` when a fully unapplied vendor
   payment should become a prepaid expense
+- either schedule recognises the whole open deposit (advance); leave
+  `amount_total` out, as a different stated amount is refused
+  (`RECOGNITION_SCHEDULE_SOURCE_AMOUNT_MISMATCH`)
 - create `recognition-schedules` directly only when there is no better
   first-class source workflow for the originating balance-sheet position, such
   as accrued revenue or accrued expense entries
@@ -380,7 +431,10 @@ history, or use a generic journal as the primary invoice correction.
   scheduled work through an `as_of` date. Templates it could not run (an
   amount finer than its currency, or a line total that differs from quantity
   × unit price) are listed under `skipped` with the field and the fix and stay
-  due: edit the template, then run due templates again
+  due: edit the template, then run due templates again. A template whose
+  customer or vendor is inactive or archived is skipped the same way (code
+  `CUSTOMER_INACTIVE` / `VENDOR_INACTIVE`, reason `party_inactive`); tell the
+  user, then reactivate the party or pause or end the template as they decide
 - pause a recurring template when the business event has stopped temporarily;
   patch the schedule when the cadence changed; resume only after the next
   remaining occurrence is correct
@@ -834,9 +888,11 @@ Subledger integrity rules:
   was open. Resolve each with `receipts/{id}:assign-preapplied`
   (`payments/{id}:assign-preapplied`): `{assignment_date, applications:
   [{invoice_id|bill_id, amount} | {opening_balance_entry_id, amount} |
-  {deposit: true, amount}]}`, at most the finding's amount. One zero-net
-  matching entry is posted; invoice (bill) items can be undone by `:unapply`,
-  the whole assignment by reversing that entry (`entries/{id}:reverse`)
+  {deposit: true, amount}]}`, at most the finding's amount; an invoice (bill)
+  item must belong to the receipt's (payment's) party, currency and control
+  account, as for `:apply`. One zero-net matching entry is posted; invoice
+  (bill) items can be undone by `:unapply`, the whole assignment by reversing
+  that entry (`entries/{id}:reverse`)
 - `credit-note-excess-review` (family `credit_note_excess_review`, count-only):
   credit notes of an earlier version whose part above the amount due sits on
   Customer Deposits without a receipt. Resolve each with
@@ -850,6 +906,24 @@ Subledger integrity rules:
   something not named paid it out: name it. A credit on a tax account is
   corrected from the control-account findings first
   (`CREDIT_EXCESS_ACCOUNT_MISMATCH`)
+- `document-consistency-review:{book_id}` (family
+  `document_consistency_review`, `Housekeeping`): documents an earlier
+  version accepted that are now refused. Nothing was changed. Findings by
+  `code`: `FUNCTIONAL_CURRENCY_RATE_NOT_ONE` (a document entry in the book's
+  own currency at a rate other than 1: void and re-enter it, or replace it, at
+  rate 1), `STATUS_CONFLICTS_WITH_AMOUNTS` (a receipt or payment whose stored
+  `status` contradicts its unapplied amount; `expected_status` is what the
+  amounts say) and `DOCUMENT_TAX_CODE_DIFFERS_FROM_LEDGER` (an invoice or bill
+  line whose tax differs from the line it posted as). For the last, run
+  `:replace-tax-code` with `source_tax_code_id` = `fix_source_tax_code_id` and
+  `replacement_tax_code_id` = `fix_replacement_tax_code_id`; it retags no
+  posted line and posts nothing. Never run it from another listed code (that
+  would retag a correct posted line); null fix codes mean void the document
+  and enter a corrected one (unapply its applications first; if its period
+  is closed or its tax return filed, issue a credit note or vendor credit and
+  a corrected document in an open period instead). Explain each finding and
+  correct it only with the user's approval; the task disappears when nothing
+  is left
 - never post a manual journal to fix these findings; the tasks state the
   ledger is unchanged
 - for an ordinary Canadian pay period on a light- or standard-approval book,
@@ -938,7 +1012,11 @@ Subledger integrity rules:
   hours only for salary profiles, and the permitted source kind. Do not send a
   caller-selected statement semantic: the versioned payroll item owns the
   earning meaning. Phase one ordinary periods require an
-  explicit confirmation that there are no paid non-work hours
+  explicit confirmation that there are no paid non-work hours. Supplementary
+  facts are plain decimal text such as `125.00` (no sign, spaces or thousands
+  separators, at most four decimals; otherwise the post refuses it with
+  `VALIDATION_FAILED` on `pay_statement_facts.<name>`; the preview does not
+  check them)
 - send an agreed pay rate exactly (`22.125`, not `22.13`). The profile
   `hourly_rate`, `earnings[].rate` and pay-statement earning rates take up to
   4 decimals, `quantity` (hours, units) on posted earnings, deductions and
@@ -959,10 +1037,17 @@ Subledger integrity rules:
   approval. Keep one stable idempotency key for the unchanged approval request
   and one for the unchanged final reverse or replacement until the outcome is
   known; after an ambiguous response, retry those exact identifiers instead of
-  creating a second correction
+  creating a second correction. A replacement re-checks the supplementary
+  facts it sends: a fact resent unchanged on a run whose statement was first
+  drawn up before App 1.5.2 is carried as stored, while a new or changed fact,
+  and every fact of a run without a statement or with a later statement, must
+  be plain decimal text. Reversals of a stored run are not re-checked
 - after posting, use the statement list/detail/payroll-run-link/render and
-  batch-export APIs. Viewing, downloading, printing or creating a ZIP does not
-  prove delivery. Record `paper_in_person` only after the real handoff, with the
+  batch-export APIs. Quote statement amounts and rates as printed, in the
+  statement's `printed_number_form` (`fr-CA` prints `1 435,28 $`; see
+  `jurisdictions/ca/smb.md`). Viewing, downloading, printing or creating a ZIP
+  does not prove delivery. Record `paper_in_person` only after the real
+  handoff, with the
   exact retained language artifact and strict factual timestamp. This event
   does not assert payment, timeliness or legal qualification. Correct a mistake
   only through the append-only provision-event preview/commit correction APIs
