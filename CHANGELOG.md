@@ -4,7 +4,23 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 
 ## [Unreleased]
 
-- Planned next release: `0.7.0`, based on the public `v0.6.0` tag.
+## [0.8.0] - 2026-10-29
+
+- Refresh the bundled Vibooks skill (1.6.0) to match Vibooks 1.6.0. License
+  commands against a Vibooks that manages its own License need `vibooks-cli`
+  1.5.0 or later.
+- Vibooks holds the License itself, so a Vibooks on a server keeps its own
+  seat. After an upgrade the existing License is handed over once; nothing is
+  restarted.
+- The agent never asks for, reads or types a License key. The person runs
+  key commands in their own terminal, where vibooks-cli asks for the key
+  without showing it.
+- Read-only License states keep the books unchanged and readable; the guide
+  covers recovery on the same computer and moving a License to a server or a
+  container.
+
+## [0.7.0] - 2026-10-26
+
 - Refresh the bundled Vibooks skill (1.5.0) to match Vibooks 1.5.2. Use
   `vibooks-cli` 1.4.0 or later.
 - Canadian payroll on Linux: Vibooks runs its own helper for the SIN vault and

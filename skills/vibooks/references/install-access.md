@@ -79,8 +79,9 @@ Preferred startup order:
      never rerun start-trial because the first reply could not verify access
    - use the actual two-letter legal country of the intended books; do not
      infer it from the interface language or purchase market
-   - if not eligible, run `vibooks-cli license activate --license-key ...` or
-     stop and ask the owner to activate the desktop
+   - if not eligible, ask the person to activate in their own terminal (see
+     "License keys" below) or on the desktop License page; never ask for the
+     key yourself
    - on desktop onboarding, keep the free-trial option enabled when eligible
      and finish setup through the official Vibooks flow
 8. only after `doctor` reports authenticated API readiness and the desktop
@@ -425,9 +426,9 @@ forward-date work: send explicit dates for every action (see Date Rules in
    `action = resume` means a trial is already active, so do not start another
 3. if trial is eligible, ask the person first, then run
    `vibooks-cli license start-trial --book-country <ISO-COUNTRY> --reason "..."`
-   with their words as the reason; otherwise run
-   `vibooks-cli license activate --license-key ... --reason "..."` with the
-   person's key and go-ahead, or stop and ask the owner to activate the desktop
+   with their words as the reason; otherwise ask the person to run
+   `vibooks-cli license activate --reason "..."` themselves (see "License
+   keys" below), or to activate on the desktop License page
    Use the actual two-letter legal country of the intended books, independently
    of interface language or purchase market.
    If `start-trial`, `license status` or `refresh` fails with "...state.json
@@ -934,6 +935,107 @@ Use only official Vibooks licensing and update flows.
   become read-only
 - `vibooks-cli license billing-portal` returns the billing link; give it to
   the person, who pays on the billing site. Never enter payment details
+
+### Where the License lives
+
+Vibooks itself holds the License, not vibooks-cli or the desktop window.
+A Vibooks install manages its own License when its `/api/discovery` lists
+`/api/license/status`. In that case `vibooks-cli license ...` and the desktop
+License page only ask Vibooks to act, and the License belongs to the computer
+or server that runs Vibooks and keeps the books. Several laptops that connect
+to one Vibooks server use one device seat. Vibooks renews the License in the
+background; nobody needs to run `license refresh` on a schedule.
+
+- After an upgrade, `license status --json` may report
+  `legacy_handoff_needed: true`. Run any `vibooks-cli license` command with a
+  current vibooks-cli on the same computer as Vibooks; it hands the existing
+  License over automatically and once. Nothing is restarted, and no new trial
+  or seat is used. If the flag stays and the old details are gone, use the
+  same-computer recovery below.
+- `status: binding_required`: the books are readable but not writable until
+  Vibooks renews once online. Run `vibooks-cli license refresh`; if the
+  computer is offline, connect it to the internet first.
+- `status: instance_mismatch`: this copy of Vibooks has License details that
+  belong to another installation (for example, a copied data folder or a
+  reinstall that lost the License details). The books stay readable. On the
+  computer that should keep working, use the same-computer recovery below.
+  Never copy License files between computers.
+- Same-computer recovery after a reinstall or a cleared data folder: a
+  licensed user runs `vibooks-cli license activate --reason "..."` in their
+  own terminal on that computer (see "License keys"); the existing seat is
+  reused. A trial user runs
+  `vibooks-cli license start-trial --book-country <same country> --reason
+  "..."`; the existing trial resumes with its original end date (an ended trial
+  does not restart).
+- Read-only License states never change the books, their approval levels or
+  pending approvals; backups, reports and payroll reads keep working. Do not
+  try to work around them by editing files.
+
+### License keys
+
+The agent never asks for, reads, relays, pipes or types a License key, and
+never puts one in a command line, file, chat message or log. Commands that
+need the key (`license activate`, and `license activations` /
+`license release-device` on a Vibooks without its own License) are run by the
+person in their own terminal: vibooks-cli then asks for the key without
+showing it. If the person prefers, they can name a file that holds the key
+(`--license-key-file <path>` instead of the prompt; `license activations` and
+`license release-device` take `--license-key-prompt` or `--license-key-file`);
+do not create or read that file for them. In an
+agent shell without a terminal these commands stop with guidance to run them
+in the person's own terminal; pass that on instead of working around it.
+License commands against a Vibooks that manages its own License need
+vibooks-cli 1.5.0 or later; with an older vibooks-cli, update it first
+(Update To The Current Official Build).
+
+### Moving a License to a Vibooks server
+
+When the person asks to move Vibooks licensing to a server (for example,
+"move the Vibooks License to my server"), Vibooks moves the seat without
+showing any License key or credential:
+
+1. On the computer that has the License now, with Vibooks running there:
+   `vibooks-cli license transfer-code --reason "..."`. Show the preview and
+   confirm with `--confirm <phrase>` as returned. The code works once, for 15 minutes.
+2. Connected to the server's Vibooks over https:
+   `vibooks-cli license transfer --code <code> --preview --reason "..."`, show the person
+   which seat is released and which server receives it, then run it again
+   without `--preview`, with `--reason` and `--confirm <phrase>` as returned.
+3. Run `vibooks-cli license status --json` on the server and continue only
+   when it reports an active License.
+
+If a code expires or is lost, ask for a new one. Repeating a finished
+transfer does not use another seat. If the original computer only has
+vibooks-cli and no Vibooks, the person frees its seat from the server with
+the License key, then activates there. These three commands carry the key, so
+the person runs them in their own terminal on (or connected to) the server
+(see "License keys"); you explain the steps and read back only what they choose
+to share:
+
+1. `vibooks-cli license activations --license-key-prompt` lists the seats.
+2. `vibooks-cli license release-device <id> --license-key-prompt --reason "..."`
+   shows what is
+   released; run it again with `--confirm <phrase>`.
+3. `vibooks-cli license activate --reason "..."` on the server.
+
+Release first: activating first fails while every seat is in use. A person
+who only had a trial starts one on the server. A Vibooks in a container
+without a stable machine identity uses a new seat each time the container is
+recreated; free the previous seat the same way.
+
+License changes (trial, activate, deactivate, releasing a seat, transfer,
+hand-over) are only accepted from the computer that runs Vibooks. To change
+the License of a Vibooks on a server or in a container from another computer,
+the server must offer Vibooks through an https reverse proxy on that same
+server; Vibooks itself does not serve https. For a container reached from its
+own host, publish the container's port on the host's loopback only (for
+example `-p 127.0.0.1:<port>:<port>`) and list the container network's gateway
+address in `VIBOOKS_LICENSE_TRUSTED_PEERS` when starting Vibooks. Never list a
+whole network (such as `0.0.0.0/0`) or other computers' addresses there: with
+the port published on all interfaces, other computers can arrive through the
+gateway too. Never send a License key to a Vibooks reached over
+plain http from another computer. The hand-over and License changes need the
+owner's access (an owner token or `--as-person`), not an agent token.
 - `vibooks-cli app update status|install|auto-download on|off` and
   `vibooks-cli app autostart on|off` run through the desktop app as host
   requests (`POST /api/host/requests`). Installing an update restarts the app,
