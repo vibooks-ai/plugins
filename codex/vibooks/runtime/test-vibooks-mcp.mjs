@@ -166,8 +166,7 @@ test("allows confirmed mutation invoke", async () => {
   }
 });
 
-// Every vibooks-cli option a tool value could pose as (`--base-url`, `--token`, `--as-person`,
-// `--no-auth`, `--reason`, `--confirm`, ...) must stay a plain value.
+// Tool values that look like vibooks-cli options must stay plain values.
 const OPTION_LOOKALIKES = [
   "--base-url=http://192.0.2.1:9",
   "--as-person",
