@@ -4,6 +4,18 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-11-16
+
+- Security: MCP tools pass every value to `vibooks-cli` as a plain value.
+  Option values use the single-argument `--flag=value` form and positionals
+  follow `--`. Operation selectors and schema names that start with `-`,
+  non-HTTP methods, routes that do not start with `/`, invalid header names,
+  and `Authorization` or `Proxy-Authorization` headers are refused before
+  `vibooks-cli` runs. Before, a crafted selector could reach `vibooks-cli` as an
+  option and select a credential the MCP keeps away from agents. Use
+  `vibooks-cli` 1.5.2 or later, which also keeps saved credentials on the
+  address they were saved for.
+
 ## [0.8.1] - 2026-11-16
 
 - Refresh the bundled Vibooks skill (1.6.1) to match Vibooks 1.6.3.

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { chmod, mkdtemp, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
@@ -139,7 +139,7 @@ test("allows read-only invoke without mutation confirmation", async () => {
     assert.equal(response.result.isError, undefined);
     const payload = JSON.parse(response.result.content[0].text);
     assert.equal(payload.ok, true);
-    assert.equal(payload.stdout.includes("invoke list-books --query limit=10 --include-status"), true);
+    assert.equal(payload.stdout, "invoke --query=limit=10 --include-status -- list-books");
   } finally {
     restoreEnv("VIBOOKS_CLI", original);
   }
@@ -159,11 +159,119 @@ test("allows confirmed mutation invoke", async () => {
     assert.equal(response.result.isError, undefined);
     const payload = JSON.parse(response.result.content[0].text);
     assert.equal(payload.ok, true);
-    assert.match(payload.stdout, /--body/);
-    assert.match(payload.stdout, /approved/);
+    assert.match(payload.stdout, /--body=\{"memo":"approved"\}/);
+    assert.match(payload.stdout, / -- post-entry$/);
   } finally {
     restoreEnv("VIBOOKS_CLI", original);
   }
+});
+
+// Every vibooks-cli option a tool value could pose as (`--base-url`, `--token`, `--as-person`,
+// `--no-auth`, `--reason`, `--confirm`, ...) must stay a plain value.
+const OPTION_LOOKALIKES = [
+  "--base-url=http://192.0.2.1:9",
+  "--as-person",
+  "--token=x",
+  "-h",
+  " --no-auth",
+];
+
+test("refuses selectors that would read as vibooks-cli options before running it", async () => {
+  await withFakeCli(async (fakeCli) => {
+    for (const tool of ["vibooks_describe", "vibooks_invoke"]) {
+      for (const selector of OPTION_LOOKALIKES) {
+        const response = await callTool(tool, { selector });
+        assert.equal(response.result.isError, true, `${tool} ${selector}`);
+        assert.match(response.result.content[0].text, /selector must not start with "-"/);
+      }
+    }
+    const schema = await callTool("vibooks_schema", { name: "--as-person" });
+    assert.equal(schema.result.isError, true);
+    assert.match(schema.result.content[0].text, /name must not start with "-"/);
+    for (const [method, route] of [
+      ["--as-person", "/v1/books"],
+      ["GET", "--base-url=http://192.0.2.1:9"],
+    ]) {
+      const response = await callTool("vibooks_describe", { method, route });
+      assert.equal(response.result.isError, true, `${method} ${route}`);
+    }
+    assert.deepEqual(await readCalls(fakeCli), []);
+  });
+});
+
+test("passes positionals after -- and option values in one argument", async () => {
+  await withFakeCli(async (fakeCli) => {
+    await callTool("vibooks_describe", { selector: "get-v1-books" });
+    await callTool("vibooks_describe", { method: "GET", route: "/v1/books" });
+    await callTool("vibooks_schema", { name: "EntryCreateRequest" });
+    await callTool("vibooks_ops", { search: "--as-person", tag: "--token=x", method: "GET" });
+    await callTool("vibooks_schemas", { search: "--base-url=http://192.0.2.1:9" });
+    await callTool("vibooks_verify", {
+      bookId: "--as-person",
+      asOf: "2026-11-11",
+      dateFrom: "--no-auth",
+      dateTo: "2026-11-11",
+      expectedAccountBalances: ["--token=x"],
+    });
+    await callTool("vibooks_invoke", {
+      selector: "list-books",
+      path: { book_id: "--as-person" },
+      query: { search: "--base-url=http://192.0.2.1:9" },
+      headers: { "X-Request-Id": "--token=x" },
+      body: "--confirm=x",
+      confirmMutation: true,
+    });
+    assert.deepEqual(await readCalls(fakeCli), [
+      ["describe", "--json", "--", "get-v1-books"],
+      ["describe", "--json", "--method=GET", "--route=/v1/books"],
+      ["schema", "--json", "--", "EntryCreateRequest"],
+      ["ops", "--json", "--search=--as-person", "--tag=--token=x", "--method=GET"],
+      ["schemas", "--json", "--search=--base-url=http://192.0.2.1:9"],
+      [
+        "verify",
+        "--json",
+        "--book-id=--as-person",
+        "--as-of=2026-11-11",
+        "--date-from=--no-auth",
+        "--date-to=2026-11-11",
+        "--expect-account-balance=--token=x",
+      ],
+      ["describe", "--json", "--", "list-books"],
+      [
+        "invoke",
+        "--path=book_id=--as-person",
+        "--query=search=--base-url=http://192.0.2.1:9",
+        "--header=X-Request-Id=--token=x",
+        "--body=--confirm=x",
+        "--include-status",
+        "--",
+        "list-books",
+      ],
+    ]);
+  });
+});
+
+test("blocks credential headers however the name is spelled", async () => {
+  await withFakeCli(async (fakeCli) => {
+    for (const name of [
+      "Authorization",
+      "authorization",
+      "AUTHORIZATION",
+      "Authorization ",
+      " Authorization",
+      "Authorization\t",
+      "Proxy-Authorization",
+      "X-Note: x\r\nAuthorization",
+    ]) {
+      const response = await callTool("vibooks_invoke", {
+        selector: "list-books",
+        headers: { [name]: "Bearer other" },
+      });
+      assert.equal(response.result.isError, true, JSON.stringify(name));
+      assert.match(response.result.content[0].text, /Do not pass|not a valid HTTP header name/);
+    }
+    assert.deepEqual(await readCalls(fakeCli), []);
+  });
 });
 
 test("reports update status from downloads and skill manifests without updating", async () => {
@@ -260,13 +368,18 @@ async function createFakeCli() {
   await writeFile(
     path,
     `#!/usr/bin/env node
+const { appendFileSync } = await import("node:fs");
+const { dirname, join } = await import("node:path");
+const { fileURLToPath } = await import("node:url");
 const args = process.argv.slice(2);
+appendFileSync(join(dirname(fileURLToPath(import.meta.url)), "calls.jsonl"), JSON.stringify(args) + "\\n");
 if (args[0] === "doctor") {
   console.log(JSON.stringify({ api_reachable: true, token_ready: true }));
   process.exit(0);
 }
 if (args[0] === "describe") {
-  const selector = args.find((arg) => !arg.startsWith("--") && arg !== "describe");
+  const separator = args.indexOf("--");
+  const selector = separator >= 0 ? args[separator + 1] : undefined;
   const method = selector === "post-entry" ? "POST" : "GET";
   console.log(JSON.stringify({ alias: selector, method, path: method === "POST" ? "/v1/books/{book_id}/entries" : "/v1/books" }));
   process.exit(0);
@@ -275,12 +388,37 @@ if (args[0] === "invoke") {
   console.log(args.join(" "));
   process.exit(0);
 }
+if (["ops", "schemas", "schema", "verify"].includes(args[0])) {
+  console.log(JSON.stringify({ args }));
+  process.exit(0);
+}
 console.error("unexpected args: " + args.join(" "));
 process.exit(2);
 `,
   );
   await chmod(path, 0o755);
   return path;
+}
+
+async function readCalls(fakeCli) {
+  try {
+    const text = await readFile(join(dirname(fakeCli), "calls.jsonl"), "utf8");
+    return text.trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+  } catch (error) {
+    if (error?.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+async function withFakeCli(run) {
+  const fakeCli = await createFakeCli();
+  const original = process.env.VIBOOKS_CLI;
+  process.env.VIBOOKS_CLI = fakeCli;
+  try {
+    return await run(fakeCli);
+  } finally {
+    restoreEnv("VIBOOKS_CLI", original);
+  }
 }
 
 function restoreEnv(name, value) {

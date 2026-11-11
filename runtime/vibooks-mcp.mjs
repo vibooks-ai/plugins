@@ -13,6 +13,9 @@ const SUPPORTED_PROTOCOL_VERSIONS = new Set([
   "2024-11-05",
 ]);
 const READ_ONLY_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const HTTP_METHOD_PATTERN = /^[A-Za-z]+$/;
+const HTTP_TOKEN_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+const CREDENTIAL_HEADERS = new Set(["authorization", "proxy-authorization"]);
 const DEFAULT_DOWNLOADS_URL = "https://vibooks.ai/downloads.json";
 const DEFAULT_SKILL_MANIFEST_URL = "https://vibooks.ai/skills/manifest.json";
 const OFFICIAL_UPDATE_PATHS = new Set(["/downloads.json", "/skills/manifest.json"]);
@@ -266,15 +269,15 @@ const toolHandlers = {
     appendOptionalFlag(cliArgs, "--method", args.method);
     return runCliTool(cliArgs);
   },
-  vibooks_describe: async (args) => runCliTool(["describe", ...buildSelectorArgs(args), "--json"]),
+  vibooks_describe: async (args) => runCliTool(buildCliArgs(["describe", "--json"], buildSelectorArgs(args))),
   vibooks_schemas: async (args) => {
     const cliArgs = ["schemas", "--json"];
     appendOptionalFlag(cliArgs, "--search", args.search);
     return runCliTool(cliArgs);
   },
   vibooks_schema: async (args) => {
-    requireString(args.name, "name");
-    return runCliTool(["schema", args.name, "--json"]);
+    requirePositional(args.name, "name");
+    return runCliTool(buildCliArgs(["schema", "--json"], { flags: [], positional: [args.name] }));
   },
   vibooks_verify: async (args) => {
     requireString(args.bookId, "bookId");
@@ -282,19 +285,36 @@ const toolHandlers = {
     if (Boolean(args.dateFrom) !== Boolean(args.dateTo)) {
       throw new UserInputError("Pass both dateFrom and dateTo together.");
     }
-    const cliArgs = ["verify", "--book-id", args.bookId, "--as-of", args.asOf, "--json"];
+    const cliArgs = ["verify", "--json"];
+    appendOptionalFlag(cliArgs, "--book-id", args.bookId);
+    appendOptionalFlag(cliArgs, "--as-of", args.asOf);
     appendOptionalFlag(cliArgs, "--date-from", args.dateFrom);
     appendOptionalFlag(cliArgs, "--date-to", args.dateTo);
+    if (args.expectedAccountBalances !== undefined && !Array.isArray(args.expectedAccountBalances)) {
+      throw new UserInputError("expectedAccountBalances must be an array of strings.");
+    }
     for (const check of args.expectedAccountBalances ?? []) {
       requireString(check, "expectedAccountBalances[]");
-      cliArgs.push("--expect-account-balance", check);
+      appendOptionalFlag(cliArgs, "--expect-account-balance", check);
     }
     return runCliTool(cliArgs);
   },
   vibooks_update_status: async (args) => buildUpdateStatus(args),
   vibooks_invoke: async (args) => {
-    const selectorArgs = buildSelectorArgs(args);
-    const operation = await describeOperation(selectorArgs);
+    // Check every input before vibooks-cli runs at all.
+    const selector = buildSelectorArgs(args);
+    const cliArgs = ["invoke"];
+    appendPairs(cliArgs, "--path", args.path);
+    appendPairs(cliArgs, "--query", args.query);
+    appendHeaders(cliArgs, args.headers);
+    if (Object.prototype.hasOwnProperty.call(args, "body")) {
+      cliArgs.push(`--body=${stringifyBody(args.body)}`);
+    }
+    if (args.includeStatus !== false) {
+      cliArgs.push("--include-status");
+    }
+
+    const operation = await describeOperation(selector);
     const method = String(operation.method ?? args.method ?? "").toUpperCase();
     const isReadOnly = READ_ONLY_METHODS.has(method);
     if (!isReadOnly && args.confirmMutation !== true) {
@@ -303,18 +323,7 @@ const toolHandlers = {
           "Set confirmMutation=true only after the user authorizes the intended Vibooks write and the payload has been reviewed.",
       );
     }
-
-    const cliArgs = ["invoke", ...selectorArgs];
-    appendPairs(cliArgs, "--path", args.path);
-    appendPairs(cliArgs, "--query", args.query);
-    appendHeaders(cliArgs, args.headers);
-    if (Object.prototype.hasOwnProperty.call(args, "body")) {
-      cliArgs.push("--body", stringifyBody(args.body));
-    }
-    if (args.includeStatus !== false) {
-      cliArgs.push("--include-status");
-    }
-    return runCliTool(cliArgs, { parseJson: false });
+    return runCliTool(buildCliArgs(cliArgs, selector), { parseJson: false });
   },
 };
 
@@ -478,8 +487,8 @@ async function runCliTool(args, options = {}) {
   return JSON.stringify(payload, null, 2);
 }
 
-async function describeOperation(selectorArgs) {
-  const result = await runCli(["describe", ...selectorArgs, "--json"]);
+async function describeOperation(selector) {
+  const result = await runCli(buildCliArgs(["describe", "--json"], selector));
   if (!result.ok) {
     throw new UserInputError(
       `Unable to resolve Vibooks operation before invoke.\n${result.stderr || result.stdout}`,
@@ -963,27 +972,47 @@ function extractVersion(value) {
   return match ? match[1] : null;
 }
 
+// Tool input never becomes a vibooks-cli option of its own: option values are passed in the
+// single-argument `--flag=value` form, and positionals go after a `--` separator, so a value
+// that looks like an option (for example `--base-url=...`) stays a plain value.
+
+/** Returns the operation selector as option arguments and positionals for buildCliArgs. */
 function buildSelectorArgs(args) {
-  const selectorArgs = [];
-  if (args.selector) {
-    requireString(args.selector, "selector");
-    selectorArgs.push(args.selector);
+  const selector = { flags: [], positional: [] };
+  if (args.selector !== undefined && args.selector !== null && args.selector !== "") {
+    requirePositional(args.selector, "selector");
+    selector.positional.push(args.selector);
   }
   if (args.method || args.route) {
     requireString(args.method, "method");
     requireString(args.route, "route");
-    selectorArgs.push("--method", args.method, "--route", args.route);
+    if (!HTTP_METHOD_PATTERN.test(args.method)) {
+      throw new UserInputError("method must be an HTTP method such as GET or POST.");
+    }
+    if (!args.route.startsWith("/")) {
+      throw new UserInputError("route must be an API route starting with /, such as /v1/books.");
+    }
+    selector.flags.push(`--method=${args.method}`, `--route=${args.route}`);
   }
-  if (selectorArgs.length === 0) {
+  if (selector.flags.length === 0 && selector.positional.length === 0) {
     throw new UserInputError("Pass selector, or pass both method and route.");
   }
-  return selectorArgs;
+  return selector;
+}
+
+/** `[...base, ...flags, "--", ...positional]`: nothing after `--` is read as an option. */
+function buildCliArgs(base, { flags, positional }) {
+  const cliArgs = [...base, ...flags];
+  if (positional.length > 0) {
+    cliArgs.push("--", ...positional);
+  }
+  return cliArgs;
 }
 
 function appendOptionalFlag(cliArgs, flag, value) {
   if (value === undefined || value === null || value === "") return;
   requireString(String(value), flag);
-  cliArgs.push(flag, String(value));
+  cliArgs.push(`${flag}=${String(value)}`);
 }
 
 function appendPairs(cliArgs, flag, pairs) {
@@ -994,7 +1023,10 @@ function appendPairs(cliArgs, flag, pairs) {
   for (const [key, value] of Object.entries(pairs)) {
     if (value === undefined || value === null) continue;
     requireString(key, `${flag} key`);
-    cliArgs.push(flag, `${key}=${String(value)}`);
+    if (key.includes("=")) {
+      throw new UserInputError(`${flag} key must not contain =.`);
+    }
+    cliArgs.push(`${flag}=${key}=${String(value)}`);
   }
 }
 
@@ -1004,11 +1036,16 @@ function appendHeaders(cliArgs, headers) {
     throw new UserInputError("headers must be an object.");
   }
   for (const [key, value] of Object.entries(headers)) {
-    if (key.toLowerCase() === "authorization") {
-      throw new UserInputError("Do not pass Authorization manually; vibooks-cli applies the configured Vibooks token.");
+    // A strict header-name check (no spaces or other separators) means the name vibooks-cli
+    // sends is exactly the name checked here.
+    if (!HTTP_TOKEN_PATTERN.test(key)) {
+      throw new UserInputError(`Header name ${JSON.stringify(key)} is not a valid HTTP header name.`);
+    }
+    if (CREDENTIAL_HEADERS.has(key.toLowerCase())) {
+      throw new UserInputError(`Do not pass ${key} manually; vibooks-cli applies the configured Vibooks token.`);
     }
     if (value === undefined || value === null) continue;
-    cliArgs.push("--header", `${key}=${String(value)}`);
+    cliArgs.push(`--header=${key}=${String(value)}`);
   }
 }
 
@@ -1022,6 +1059,14 @@ function stringifyBody(value) {
 function requireString(value, name) {
   if (typeof value !== "string" || value.trim() === "") {
     throw new UserInputError(`${name} must be a non-empty string.`);
+  }
+}
+
+/** A value passed as a vibooks-cli positional: never something that reads as an option. */
+function requirePositional(value, name) {
+  requireString(value, name);
+  if (value.trimStart().startsWith("-")) {
+    throw new UserInputError(`${name} must not start with "-".`);
   }
 }
 
