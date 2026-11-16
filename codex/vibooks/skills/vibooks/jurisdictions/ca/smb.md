@@ -171,6 +171,16 @@ economic event and pay-date period, and use the official correction operation.
 Older records without verified retained authorization require a current Payroll
 place. Current statutory readiness remains required.
 
+Every native payroll calculation seals the employee's year to date: every posted
+run of the tax year paid on or before its pay date, including another run paid
+the same day. Post each calculation soon after previewing it. When the run
+replaces or corrects a posted run, send that run's ID as `correction_source_id`
+in the preview so its year to date leaves it out. If posting answers `409
+PAYROLL_YTD_BASIS_CHANGED`, another run was posted, reversed or replaced since,
+or the replacement did not name the run it replaces: preview again and post the
+new result, never the old one. A payroll batch holding a stale calculation is
+cancelled and created again.
+
 For supported Canadian payroll dates, treat statutory payroll and vacation pay
 as effective-dated, server-selected bookkeeping workflows. Never extend a prior
 rule release because the next interval appears unchanged. If Vibooks reports a

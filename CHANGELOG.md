@@ -4,6 +4,21 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-16
+
+- Refresh the bundled Vibooks skill (1.6.1) to match Vibooks 1.6.3.
+- Bookkeeping guidance follows the 1.6.3 posting and verification rules:
+  foreign funds stay in their own currency through deposits, transfers,
+  statement lines and settlements; reversing a filed tax return, reverse-charge
+  purchases and period locks; inventory opening stock as its own step and
+  inventory costing on its own date.
+- Canadian payroll: payroll corrections keep posted accounts, a run with a pay
+  statement is replaced only by a Vibooks calculation, monthly vacation
+  reassessments reissue later pay statements, and the Quebec HSF employer
+  setting.
+- When the desktop's local service cannot start, the agent sends the person to
+  the app's own screen instead of retrying.
+
 ## [0.8.0] - 2026-10-29
 
 - Refresh the bundled Vibooks skill (1.6.0) to match Vibooks 1.6.0. License

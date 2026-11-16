@@ -111,6 +111,10 @@ The summary exposes, per tax code:
 - `purchase_base_total` and `purchase_tax_total` for claimable input-tax
   activity
 - `net_tax` as sales tax less claimable purchase tax
+- `self_assessed_tax_total` for tax self-assessed on reverse-charge purchases
+  (line 405 of a GST/HST return), not part of `net_tax`
+- `tax_owing_total` as `net_tax` plus `self_assessed_tax_total`: the tax owing
+  (positive) or refundable (negative)
 - `source_currency`, `scale`, `posting_scale`, `reporting_scale`, and
   `calculation_scale` from the effective book policy when available
 - `invoice_rate_groups` for source-document, per-tax-code review of
@@ -172,9 +176,12 @@ report access after expiry also applies to accountant packages.
 
 An accountant package is for review, not a restorable book transfer or database
 backup. Its attachment manifest lists evidence; it does not bundle the original
-attachment files. Portable whole-book export/import and backup/restore retain
-their separate module requirements. Check live discovery on the connected app;
-an older app may require an upgrade to provide report-based package access.
+attachment files. Creating a backup (`POST /api/admin/backup`) and exporting a
+book (`POST /api/admin/export-book`) need no licence module: a person can always
+take their own records out, even after deactivating a computer. Book import and
+the automatic backup plan keep their module requirements. Check live discovery on
+the connected app; an older app may still require modules for backup and export,
+and may require an upgrade to provide report-based package access.
 
 When importing a book, first read `approval_level` in
 `POST /api/admin/import-book:preview` (`source`, `planned`,
@@ -227,11 +234,42 @@ Rules:
   `adjustments`, `net_tax` and `settlement_amount` with the person before
   filing (`tax-returns/{id}:file`), and file only once the period data is
   complete and the person says to file it; send their words as `reason`
-- `net_tax` is exactly the net tax to enter on the form. `adjustments`
-  (`prior_report_correction`, `late_tax_collected`) correct earlier returns:
-  report them as corrections of those returns, outside the current form.
-  `settlement_amount` (`net_tax` plus `adjustments_total`) is what the filing
-  settles
+- `net_tax` is exactly the net tax to enter on the form (line 109 of a
+  GST/HST return). `self_assessed` rows total `self_assessed_tax`, the tax
+  self-assessed on reverse-charge purchases (line 405), reported outside
+  `net_tax`. `adjustments` (`prior_report_correction`, `late_tax_collected`,
+  `late_tax_self_assessed`) correct earlier returns: report them as
+  corrections of those returns, outside the current form.
+  `settlement_amount` (`net_tax` plus `self_assessed_tax` plus
+  `adjustments_total`) is what the filing settles
+- to correct a filed return in Vibooks, reverse its filing with
+  `tax-returns/{tax_return_id}:reverse` (`reason` required; `reversal_date`
+  applies when the filing posted an entry and defaults to today). It needs the
+  `tax_return.reverse` approval at the book's level whether or not anything
+  posts: Light approves it as you confirm; on Standard or Strict request it
+  with `POST /approvals` (action `tax_return.reverse`, target the return,
+  request_payload the `:reverse` body without `approval_id`) and send its
+  `approval_id`. A nil return or a filing that posted no entry is reversed the
+  same way and posts nothing. Do not reverse a filed return's filing entry
+  with `entries/{id}:reverse` (refused, `ENTRY_REVERSE_USE_TAX_RETURN`).
+  Reverse later returns first if the period will be filed again, then
+  `:refresh` and `:file` it again with its original `filing_date`
+- reverse a standalone tax posting run with `tax-postings/{run_id}:reverse`
+  (approval `tax_posting.reverse`, target the run); a filing's run is reversed
+  from its return
+- a return's `posting_date` and `filing_date` must be dates on or after
+  `period_end`; a tax posting run's `posting_date` must be on or after its
+  `as_of`
+- record the sale of capital property used in the business (equipment,
+  vehicles) with the GST/HST code on the credited asset line and the tax
+  credited to GST/HST payable (Dr bank, Cr asset [code], Cr tax payable);
+  Vibooks reports it as tax collected (line 103). A supplier's refund on such
+  property credits the asset [code] and GST/HST recoverable, and reduces input
+  tax credits (line 106)
+- when a return filed before 1.6.3 shows `side_reclassified`, tell the person
+  to correct that return with the CRA (add the amount to line 103 and to line
+  106; net zero) and post a journal moving the amount from GST/HST payable to
+  GST/HST recoverable; later returns do not report it again
 - filing moves the reported tax out of the payable and recoverable tax
   accounts into the settlement account (`offset_account_id`), which then holds
   the net owing to or refundable from the authority. Filing records what is
@@ -454,8 +492,12 @@ Rules:
 - when matching, require the same statement account, the same source currency,
   and no duplicate reuse of an entry that is already matched to another
   statement line for the same account
-- Vibooks may match within a controlled timing window around `statement_date`;
-  matching does not make that field the transaction's recognition date
+- a manual match accepts a posted entry dated on or before the line's
+  `statement_date` however old (a cheque cashed weeks later), and an entry
+  dated after the line only within the 14-day window; `:match-candidates`
+  suggests the window by default, and `?purpose=match` lists every entry a
+  match accepts; matching does not make `statement_date` the transaction's
+  recognition date
 - one statement line may match multiple posted entries when their net movement
   on the statement account equals the signed statement amount
 - when a statement line reveals a missing transaction and the full treatment is
@@ -473,8 +515,19 @@ Rules:
   movement are themselves supported; if they are not, or approval is absent,
   leave the line `unmatched` so reconciliation and period close remain blocked;
   do not convert a genuine unrecorded movement to `reviewed_exception`
-- use reviewed exceptions only for lines that are explained and documented but
-  cannot yet be formally matched
+- review a line as an exception only when it is explained and documented but
+  cannot be matched exactly (a net payout, a home-currency line for an entry
+  recorded in another currency, a timing difference), and name the posted
+  entries it covers with `entry_ids` (`?purpose=exception` lists them);
+  `timing_difference`, `net_settlement_exception` and
+  `processor_settlement_exception` require them; whatever the line and its
+  entries do not agree on stays in the reconciliation's difference
+- an exception that covers no entry is bank activity the books do not hold:
+  it keeps every reconciliation of its date open (`EXCEPTION_WITHOUT_ENTRIES`);
+  record the fee, interest or other movement instead of leaving it as an
+  exception; payroll payments are matched, never covered by an exception
+- an exception reviewed before Vibooks 1.6.3 names no entries; review it again
+  with the entries it covers
 - when statement evidence proves only that money moved, keep the business
   nature, recognition date, and tax-documentation checks unresolved instead of
   inventing them from the bank memo
@@ -488,9 +541,55 @@ Rules:
    transaction, or—with explicit approval—record a genuine but unclassified
    movement against suspense without a tax claim; then auto-match it
 4. ignore unmatched lines only with a reason
-5. create a reconciliation snapshot
-6. treat reconciliation as complete only when unmatched items and unexplained
-   difference are zero
+5. create a reconciliation with `post-v1-books-book-id-reconciliations`,
+   sending the `statement_ending_balance` printed on the statement for
+   `statement_date`; the field is required and must come from the statement,
+   never from the ledger or an earlier read of `ledger_balance`
+6. read the result from the `current_*` figures: `statement_ending_balance`,
+   less `current_unmatched_amount`, plus `outstanding_increase_total`
+   (deposits in transit), less `outstanding_decrease_total` (outstanding
+   cheques and payments), is `current_adjusted_statement_balance`;
+   `current_difference` is that less `current_ledger_balance`; the stored
+   `adjusted_statement_balance` and `difference` are the snapshot at creation
+7. treat reconciliation as complete only when `status` is `completed` and
+   `needs_review` is false; otherwise follow `open_reasons` or `review_reasons`
+
+Outstanding-item rules:
+
+- a posted entry is cleared on the statement date only when a statement line of
+  the account dated on or before that date is matched to it or covers it as an
+  exception; other entries dated on or after the account's first statement line
+  are listed in `outstanding_items` (create and detail reads)
+- an outstanding cheque, payment or deposit is normal: do not create, move or
+  reverse entries to make it disappear; it clears when the next statement's
+  line is matched to it, and the earlier reconciliation keeps showing it as
+  outstanding on its own date (`cleared_statement_date` gives the later date)
+- investigate an item that stays outstanding over several statements (a stale
+  cheque, a deposit that never arrived) through the owning document's
+  correction workflow, never a balancing journal
+- an entry matched to a statement line, or covered by an exception, is cleared
+  on that line's date wherever its own date falls; only unlinked entries dated
+  before the account's first statement line (`statement_lines_from`) and
+  opening balance entries are presumed in the statement's opening balance;
+  check `presumed_cleared_items` on the first reconciliation, and match an old
+  cheque that cleared after the first line to its line instead of leaving it
+  presumed
+- `LINE_MATCHED_TO_LATER_ENTRY` means a line is matched to an entry the books
+  date after the statement date; correct the entry's date through its document
+  workflow if it belongs in the period, otherwise expect the difference until
+  the next reconciliation
+- a reconciliation stays open with `NO_STATEMENT_LINES` until statement lines
+  dated on or before the statement date exist for an account with activity
+  besides its opening balance
+- a completed reconciliation with `needs_review` true (for example one an
+  earlier version completed without the statement's balance) is not evidence
+  that the account is reconciled; create a new reconciliation for that
+  statement date with the statement's ending balance, and never edit or delete
+  the old one. Tasks lists each account whose latest completed reconciliation
+  needs review, until a later reconciliation agrees. When the reason is a
+  statement in another currency, Vibooks cannot reconcile it again yet: ask
+  the person's accountant to compare the statement's ending balance with the
+  account instead
 
 Statement-account review rule:
 
@@ -509,7 +608,9 @@ statements, but keep the ledger account itself as a liability.
 3. post each charge to that liability account
 4. post each payment against that liability account
 5. import or create card statement lines for the same liability account
-6. compare the liability balance to the card statement ending balance
+6. create the reconciliation with the card statement's ending balance (an
+   amount owed is positive); outstanding increases are charges not yet on the
+   statement and outstanding decreases are payments and credits not yet on it
 7. investigate timing differences, missing charges, duplicate charges,
    interest, fees, and card-payment settlement timing
 8. do not consider the card reconciled until the liability balance ties to the
@@ -529,8 +630,26 @@ Statement-balance direction rules:
 Before closing a period:
 
 1. run trial balance
-2. run balance sheet
-3. run income statement
+2. run balance sheet; it lists asset, liability and equity accounts only, and
+   current earnings reach it through the `retained_earnings` line
+3. run income statement. `total_income` is operating revenue (always present,
+   0.00 when there is none); interest, FX gains and other non-operating income
+   are in `other_income` / `total_other_income` after operating expenses. An
+   account whose report category is `revenue`, `sales` or `operating_revenue`
+   always counts as operating revenue. `gross_profit` = `total_income` −
+   `total_cost_of_sales`; `net_income` = `total_income` +
+   `total_other_income` − `total_expenses`. An opening balance entered with a
+   date inside a cash flow or equity rollforward period appears on its own
+   line (opening balances entered in the period), not as a financing inflow or
+   an owner movement. The tax summary's per-document breakdown lists each
+   document's current lines, the original lines a replacement superseded, and
+   every reversal of a voided, cancelled or replaced document, each on its own
+   entry's date (a reversal negated), so the rows add up to the totals. Its `previous` amounts cover the range in
+   `previous_period` (`date_from`, `date_to`): a month, quarter or fiscal year
+   is compared with the previous one of the same shape, any other range with
+   the same number of days just before it. Name that range when you quote a
+   comparison; to compare with another period (for example the same month
+   last year), request that range as its own report
 4. run general ledger for review; `reports/general-ledger` accepts `search`
    (account code or name, description, document number, entry, date, amount)
    and `account_id`, applied before paging: use them instead of paging through
@@ -542,7 +661,10 @@ Before closing a period:
    control balance: explain any non-zero `reconciliation.ar.unattributed` or
    `reconciliation.ap.unattributed` to the person (for example an opening
    balance or a manual journal on a control account) and never journal it
-   away; surface every document in `qualifications`. The Overview
+   away; surface every document in `qualifications`: a
+   `LEDGER_OPEN_AMOUNT_DIFFERS` item is a document whose stored open amount
+   disagrees with its postings, so resolve it with the person before closing.
+   The Overview
    `accounts_receivable` and `accounts_payable` equal the aging total on the
    dashboard's `as_of`; read `open_items` for overdue, per-currency figures
    and the reconciliation, and when `open_items_unavailable` is present, say
@@ -587,7 +709,30 @@ Before closing a period:
    any adjusting entry. Never post it yourself; Vibooks does not post it either
 9. when dimensions are used for departments, projects, branches, or locations,
    run grouped management reports with `group_by_dimension_id` and targeted
-   slices with `dimension_filter`
+   slices with `dimension_filter`. Filters select journal lines, and documents
+   tag their revenue and expense lines, not their receivable, payable, tax or
+   bank lines, so a filtered trial balance or balance sheet includes a row
+   with `line: "not_specified"` ("Not specified") holding the net of what the
+   filter leaves out. It is not an account and not an error; never post
+   entries to remove it. Only an unfiltered report refused with
+   `REPORT_NOT_RECONCILED` means the ledger needs attention. A filtered cash
+   flow classifies tagged cash by its whole entry and reports tagged cash moved
+   to or from untagged cash accounts as `cash_transfers_not_specified`
+   - the cash flow is direct-method and every cash line is a gross flow: cash
+     received goes to the activity that supplied it and cash paid to the
+     activity that used it; a void or reversal is classified like its original
+     and cancels it; an FX run's change in foreign-currency cash appears as
+     `exchange_rate_effect`, outside the activities; investing or financing
+     done without cash ends the report with a `non_cash_investing_financing`
+     row (`row_kind: disclosure`), negative when a void takes back an earlier
+     one and never including opening balances or FX runs; it lists only what
+     the entry's own cash did not pay or receive: present it as a note, not as
+     a cash flow. A realised exchange gain or loss on a transfer between bank
+     accounts in different currencies shows as operating cash
+   - selling an asset by a manual journal with a gain shows the gain as
+     operating; record sales through Fixed Assets to keep all proceeds in
+     investing. An expense the owner or a lender paid directly is not listed as
+     a non-cash activity
 10. when Canadian vacation pay is active, run the vacation-pay report as of the
     close date; require employee event balances to equal the active Vacation Pay
     Payable GL balance, each reference period's target/credit/true-up trace to
@@ -716,7 +861,10 @@ rather than demanding every period since hire for a long-serving employee.
 The source window is 53 weekly, 27 biweekly, 25 semimonthly, 13 monthly, or
 14 four-weekly periods, or the shorter employment history. Block 15B uses its
 own shorter earnings window; missing, duplicated, or overlapping required
-periods must remain blockers. For each Block 17B fact, verify a holiday after
+periods must remain blockers. Blocks 15B and 15C are insurable earnings, not
+gross pay, and a non-insurable Block 17C amount (E00, R00, H00) is never added
+to them; a draft export that returns `ROE_ARTIFACT_STALE` needs a corrected
+successor worksheet. For each Block 17B fact, verify a holiday after
 Block 11, positive exact two-decimal `amount`, nonnegative `hours` with at most
 four decimal places, explicit `source_inclusion`, and a nonempty
 `source_evidence_reference`. Unknown inclusion or an amount alone is insufficient.

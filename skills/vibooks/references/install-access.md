@@ -176,6 +176,11 @@ Product install detection:
    to start listening; Vibooks waits for the confirmed local bind settings
 6. only wait for `LOCAL_API_BASE/api/health` after local startup has been
    explicitly confirmed
+7. if the desktop app is open but its local service does not start or stops
+   answering, ask the person to look at the Vibooks window: it says why the
+   service cannot start, offers Try again, can check for and install an update
+   without the service, and can save a diagnostics file for support. Do not
+   start, stop or replace the desktop service yourself while the app manages it
 
 For a truly clean local desktop reinstall:
 
@@ -556,7 +561,16 @@ applying payments, imports, previews, reads and setup.
   their go-ahead and which need another person. Each operation lists its
   `class` (`routine`, `needs_confirmation` or `second_person`),
   `class_if_light`, `confirmation_phrase` and `caller_has_authority`; the read
-  also lists `other_approvers` and `lowering`
+  also lists `other_approvers` and `lowering`. An operation's
+  `additional_approvals` names further approvals it consumes (an employer
+  insurance correction also needs the reversal of the original posting,
+  named by `command.facts.reversal_approval_id`), so read it as well as
+  `class`
+- voiding, cancelling or replacing a document, replacing a payroll run or
+  settlement, and withdrawing or replacing a remittance payment consume an
+  approved `entry.reverse` request for the document's posted entry on
+  Standard and Strict: create it with the exact request body minus
+  `approval_id`, have another person approve it, then send `approval_id`
 - before a step that needs confirmation, ask in one sentence first and send
   the person's own words as `reason`
 - for a step with a phrase, show the person the preview and send the phrase
@@ -580,6 +594,24 @@ applying payments, imports, previews, reads and setup.
   approver token for another principal, and removing the last other approver
   of a `standard` or `strict` book, need the person's go-ahead and the phrase
   from the first refusal
+- approvals bind what they approve: an `entry.post` or `entry.batch_post`
+  approval records the posting content of each draft entry it names
+  (attachments are not part of it). Finish editing a draft before you request
+  its posting approval. If the draft changes afterwards
+  (`PATCH /v1/books/{book_id}/entries/{entry_id}`), Vibooks expires the open
+  request (`status: expired`, `expired_reason: entry_changed`): request a new
+  approval for the entry as it is now and ask the approver to approve that one.
+  Saving the draft without changes keeps the approval. Approving or posting
+  with a request whose draft changed answers `APPROVAL_NOT_APPROVED` or 409
+  `APPROVAL_CONTENT_CHANGED`; never retry with the same approval. The
+  approval-policy read shows each operation's `approval_binding`
+  (`request_body`, `draft_content`, `plan_fingerprint`). After updating to
+  1.6.3, open posting approvals from earlier versions read `expired` with
+  `expired_reason: approval_predates_content_binding`; request them again
+- give an approval's `expires_at` as an RFC 3339 time with its zone (for
+  example `2026-12-31T23:59:59Z`) later than now, or leave it out (or give a
+  year-9999 time) for no expiry
+- data and book exports from Vibooks 1.6.3 do not open in 1.6.1 or earlier
 - change a book's approval level only when the person asks. With another
   approver, request approval of `book.lower_approval_level` (request payload
   `{"approval_level": "<new level>"}`) and send the change with that
@@ -629,6 +661,13 @@ Rules:
 - never store secrets in the repo or workspace
 - when an explicit loopback address is needed, prefer a numeric loopback host
   over `localhost`
+- a saved API token, local bootstrap credential or `--as-person` credential is
+  used only with the exact address (scheme, host and port) it was saved for;
+  setting `VIBOOKS_BASE_URL` to any other address, including `localhost`
+  instead of `127.0.0.1`, sends no saved credential
+- a Vibooks server on another computer needs an `https://` address and its
+  own token in `VIBOOKS_TOKEN`; `vibooks-cli` refuses to send any token over
+  plain `http://` except to a loopback address
 - do not expose the local API on `0.0.0.0` unless the user explicitly asks for
   a remote-access setup
 - prefer environment variables over CLI flags for secrets
@@ -708,6 +747,14 @@ Approvals above):
 Run the preview, show the person the result and ask; then apply with their
 words as `reason` and the preview's `confirmation_phrase` only if their reply
 contains it: preview → phrase → apply. Vibooks always keeps the newest backup.
+Before permanently deleting a Book, read the preview's `safety_copy`. When it
+is true (the desktop app's local Core), Vibooks first saves a safety copy of
+the whole workspace, named in the response's `guard_backup_path` and listed as
+backup kind `delete_guard`; restoring it returns every Book to the moment
+before the delete, so later changes to other Books are lost (tell the person
+before restoring), and only backup cleanup removes it. When `safety_copy` is
+false or missing (the cloud service), no copy is kept and the deleted Book
+cannot be recovered; say so before confirming.
 Confirming records of a Book imported by an older version also needs the
 person's go-ahead (see `references/workflows/verification.md`).
 

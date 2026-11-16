@@ -121,6 +121,36 @@
   `entries/{entry_id}:reverse`, set `reversal_date` instead; if the
   workflow-specific date is optional and omitted, Vibooks defaults it to
   today
+- a closed period locks every date before it, even a period that still shows
+  open; a posting dated before it is refused with `PERIOD_CLOSED` naming the
+  closed period. Reopen periods from the latest back
+  (`PERIOD_REOPEN_OUT_OF_ORDER` otherwise) before posting a back-dated
+  correction
+- `assignment_date` must be on or after the receipt or payment date and every
+  invoice, bill or opening balance it settles; a replacement invoice or bill's
+  `issue_date` may not be later than the earliest receipt, payment or
+  vendor-credit application or credit note still on the document
+  (`DOCUMENT_DATE_AFTER_SETTLEMENT`); unapply first or keep the date
+- to move a document to its real date while its original period is open,
+  replace it with the new document date and omit `posting_date`: the original
+  is reversed on its own date and the replacement posts on the new date. Send
+  `posting_date` only to book a correction in a later period on purpose
+- `REVERSAL_OF_A_REVERSAL` and `DOCUMENT_ENTRY_REVERSED_WHILE_LIVE` review
+  findings are read-only: do not reverse the re-posting (it is refused); show
+  the person the owning document and propose a manual journal entry in an open
+  period with the first reversal's lines and identical `tax_code_id` and
+  `tax_detail`; receivables or payables lines need their accountant
+- a reversal entry (one with `reverses_entry_id`, or `source_type`
+  `reversal`) cannot itself be reversed: generic `entries/{entry_id}:reverse`
+  refuses it with `ENTRY_REVERSE_REVERSAL_NOT_ALLOWED`. To undo a mistaken
+  void, cancel, replace or run reversal, record a new document, run or entry
+  instead
+- an earlier version allowed reversing a reversal, which put a voided,
+  cancelled or replaced document's amounts back in the books while it stayed
+  voided. If you find such a pair, do not try to reverse it again; tell the
+  person and, with their go-ahead, record one journal entry that removes those
+  amounts, copying the original lines' tax code and tax detail so the sales tax
+  return stays correct
 - reversing an entry, transfer, settlement, bank deposit, inventory
   adjustment, payroll or fixed-asset run, vacation calculation or recognition
   line needs the person's go-ahead first: ask in one sentence and send their
@@ -401,6 +431,19 @@ correction.
 
 ## Recurring Bookkeeping
 
+- on a Strict book, a recurring journal template set to post creates a draft
+  marked `approval_required`; request an `entry.post` approval for that draft
+  from another person, then post it with `entries/{id}:post` and `approval_id`
+- before disposing of a fixed asset (`fixed-assets/{asset_id}:dispose`),
+  depreciate it with `:depreciate` through the month before the disposal date;
+  depreciating the disposal's own month is optional. A disposal is refused
+  before the acquisition date (`FIXED_ASSET_DISPOSAL_BEFORE_ACQUISITION`), while
+  months are left to depreciate (`FIXED_ASSET_DEPRECIATION_INCOMPLETE`; its
+  message gives the `months` and `as_of` to send), or when depreciation is
+  posted for a month after the disposal
+  (`FIXED_ASSET_DISPOSAL_BEFORE_DEPRECIATION`; reverse those runs with
+  `fixed-asset-runs/{run_id}:reverse`, latest first, then dispose). Never adjust
+  accumulated depreciation with a manual journal instead
 - create recurring templates for activity that repeats on a schedule and should
   stay first-class, such as rent bills, subscription invoices, monthly
   depreciation journals, or standing accruals
@@ -416,6 +459,15 @@ correction.
   as accrued revenue or accrued expense entries
 - choose `invoice`, `bill`, or `entry` template kinds based on the real source
   workflow; do not turn recurring AR or AP into manual journals
+- invoice and bill templates may carry `adjustments` (discounts, surcharges)
+  in the same shape as the invoice or bill; they are validated when the
+  template is saved, stored with their `mode` (inferred when omitted, so name
+  it to be explicit), and added to every occurrence, with a percent
+  recomputed on each occurrence's subtotal. A template saved before App 1.6.3
+  has no `adjustments` field: read the template, and when the business
+  expects a standing discount or surcharge it lacks, patch the full
+  `template` with it before the next run instead of correcting each generated
+  invoice or bill afterwards
 - do not use recurring templates to imitate prepaid or deferred recognition
   schedules line by line when one originating balance should be amortized or
   recognized over time
@@ -427,6 +479,11 @@ correction.
 - use `:reverseLatest` on the recognition schedule when the latest release was
   posted on the wrong date or into the wrong period; do not correct those
   schedule-backed entries with generic entry reverse
+- a recurring invoice or bill template in another currency
+  (`needs_exchange_rate: true`) posts each occurrence at the rate of its date:
+  `runDue` skips it (`skipped[].reason: exchange_rate_required`) and leaves it
+  due; run it with `recurring-templates/{id}:run` and `exchange_rate` (book
+  currency per unit on the occurrence date), then run due templates again
 - use `post-v1-books-book-id-recurring-templates-run-due` to catch up missed
   scheduled work through an `as_of` date. Templates it could not run (an
   amount finer than its currency, or a line total that differs from quantity
@@ -438,8 +495,20 @@ correction.
 - pause a recurring template when the business event has stopped temporarily;
   patch the schedule when the cadence changed; resume only after the next
   remaining occurrence is correct
-- for recurring journal templates, keep `source_type` business-meaningful and
-  prefer a stable `source_ref_prefix` so generated entries remain auditable
+- a manual journal entry's `source_type` is your own label (`manual`,
+  `journal`, `adjustment`, `accrual`). Never use a type a workflow records
+  (`opening_balance`, `reversal`, `invoice`, `bill`, `receipt`, `payment`,
+  `credit_note`, `expense`, `sales_receipt`, `purchase_receipt`,
+  `vendor_credit`, refunds, `settlement`, `transfer`, `bank_deposit`,
+  `bank_line`, `inventory_adjustment`, `recognition_schedule`, `tax_posting`,
+  `fx_remeasurement`, `payroll` or any `payroll_*`, `vacation_pay*` or
+  `fixed_asset_*` type, in any letter case): it is refused with
+  `VALIDATION_FAILED` on `source_type`. Use the workflow instead (opening
+  balances through `opening-balances`)
+- for recurring journal templates the same labels apply; prefer a stable
+  `source_ref_prefix` so generated entries remain auditable. When `runDue`
+  skips a template because of its `source_type`, PATCH the template's
+  `source_type` to one of your own labels
 
 ## Customer-Facing Document Templates
 
@@ -525,7 +594,14 @@ Use the correct field for the correct date:
   when both transaction and posting dates are shown, retain the transaction
   date in the original evidence and the bank-line `reference` or `note`, and
   never use the statement period-end or closing date
-- `application_date`: when a receipt or payment is applied to AR or AP
+- `application_date`: when a receipt, payment or supplier credit is applied
+  to AR or AP; never before that receipt, payment or credit, nor before the
+  invoice or bill it settles (`APPLICATION_DATE_BEFORE_DOCUMENT`), and in an
+  open period even when `posting_date` is later. A receipt or payment created
+  with `applications` applies on its own date, so date it on or after every
+  document it pays, or create it unapplied and apply it later
+- `unapply_date`: never before the application it undoes
+  (`UNAPPLY_DATE_BEFORE_APPLICATION`), and in an open period
 - `action_date`: the accounting date for cancellation or void workflows on
   posted source documents
 
@@ -589,10 +665,11 @@ Use:
 - `transfers` for bank, debit, cash, and credit-card statement-account
   movements between the business's own accounts
 - `settlements` for platform, payment-processor, POS-summary, OTA, and other
-  external payout events where gross activity, fees, refunds, taxes, reserves,
+  external payout events where gross activity, fees, refunds, reserves,
   adjustments, and net cash settle together; use `lines[]` when the statement
   has variable processor components instead of forcing every amount into the
-  fixed gross/tax/fee/refund/reserve fields
+  fixed gross/fee/refund/reserve fields; sales tax the business collected or
+  paid on fees never goes on a settlement (see below)
 - on invoices, bills, sales receipts, and expenses, use document
   `adjustments[]` for separate non-tax fee, levy, tip, rebate, or similar
   components instead of hiding them inside subtotal lines or tax setup
@@ -611,8 +688,8 @@ Use:
   or partial-credit semantics, keep it as a normal document line instead of an
   adjustment
 - `bank-deposits` when cash, undeposited funds, owner contributions, loan
-  proceeds, direct income, customer-deposit holding balances, or similar
-  non-statement source accounts are deposited into a bank statement account
+  proceeds, direct income, or similar non-statement source accounts are
+  deposited into a bank statement account
 - `payroll-runs` for payroll results that post wages, withholdings, employer
   tax, liabilities, and cash settlement
 - `opening-balances` for cutover balances
@@ -629,8 +706,18 @@ Use:
   order-level reporting, refund tracing, or invoice-like support. Summary
   settlement is acceptable for anonymous POS, restaurant, retail, marketplace,
   or Stripe batches when the external report is retained as evidence and
-  Vibooks only needs gross sales, tax, refunds, reserves, fees, adjustments,
-  and net payout at the batch level
+  Vibooks only needs gross sales, refunds, reserves, fees, adjustments, and
+  net payout at the batch level
+- sales tax never goes on a settlement: settlement lines carry no tax code,
+  so tax posted there does not reach the sales tax return (current Vibooks
+  refuses a settlement line to a sales tax account). When the batch includes
+  GST/HST, QST, PST or other sales tax the business collected, record the
+  batch's sales as one `sales-receipt` with tax codes and `payment_account_id`
+  set to the processor clearing account, then settle that clearing account
+  with a `settlement` whose gross line names the `sales_receipt_id`. Tax that
+  a marketplace collected and remits itself is not the business's sales tax;
+  leave it out of the sales and record only what the business earned and was
+  paid
 - for Stripe, payment processor, marketplace, POS, or OTA evidence that
   identifies customer-level sales, create the customer sale first as a
   `sales-receipt` with `payment_account_id` set to the configured processor
@@ -674,6 +761,30 @@ Subledger integrity rules:
   automatically and add the required COGS versus inventory support lines
 - inventory item lines on bills and expenses receive stock automatically into
   inventory instead of requiring a separate inventory receipt or adjustment
+- manual inventory activity (`items/{item_id}:receive`, `:issue`, `:adjust`,
+  `:revalue`) is for stock no document moves: counts, spoilage, internal use,
+  write-downs. Stock leaves at the item's average cost: never send `unit_cost`
+  on `:issue` or a negative `:adjust` (another value is refused with
+  `INVENTORY_OUTBOUND_UNIT_COST_NOT_ALLOWED`); use `:revalue` to change what
+  stock is carried at. Taking the whole quantity relieves the whole value
+- every inventory movement, manual or on a document, is costed from the item's
+  stock on its own date, and an issue or sale needs that stock on its date and
+  every later date (`INVENTORY_QUANTITY_UNAVAILABLE` names the date). Later
+  movements are not recosted, so record purchases before back-dated sales
+  where the evidence allows. A `:revalue` cannot be dated before the item's
+  latest movement (`INVENTORY_REVALUE_BEFORE_LATEST_MOVEMENT`), and an issue or
+  sale cannot be dated before a later revaluation
+  (`INVENTORY_MOVEMENT_BEFORE_REVALUATION`). `INVENTORY_COST_UNAVAILABLE_ON_DATE`
+  means the item's history cannot be rebuilt for that date: date the movement
+  after its latest movement or ask the person
+- leave `offset_account_id` out unless evidence names another account: a count
+  gain or loss and a revaluation in either direction offset 5105 Inventory
+  Adjustment Expense; an issue relieves to the item's COGS account; a manual
+  receive credits 2205 Inventory Clearing (prefer a purchase receipt or bill)
+- change an Item's `inventory_account_id` only while it holds no stock
+  (`INVENTORY_ACCOUNT_CHANGE_WITH_STOCK`); to move stock to another inventory
+  account, `:adjust` it out, change the account, then `:adjust` it back in at
+  the same `unit_cost`
 - do not use purchase receipts for same-day billed purchases; use bills or
   expenses directly when the supplier tax document is already available
 - a cancelled vendor credit has `unapplied_amount` "0.00" and cannot be
@@ -695,9 +806,128 @@ Subledger integrity rules:
   not journal these differences by hand
 - bank deposits debit the destination bank statement account and use signed
   source lines: positive lines credit non-statement sources such as
-  undeposited funds, cash on hand, revenue, equity, loan liabilities, or
-  customer-deposit holding balances; negative lines debit deductions such as
-  merchant fees so the bank line stays at the net deposit
+  undeposited funds, cash on hand, revenue, equity, or loan liabilities;
+  negative lines debit deductions such as merchant fees so the bank line stays
+  at the net deposit
+- `bank-deposits` takes `currency`, the currency of the deposited funds and of
+  every line amount; omitted, it is the book's currency. Never put Accounts
+  Receivable, Accounts Payable, Customer Deposits or Vendor Advances on a
+  deposit, settlement, statement-line entry, document line or funding account
+  (`CONTROL_ACCOUNT_DOCUMENT_REQUIRED`). Record money a customer paid as a
+  `receipt`; left unapplied, it is the customer's deposit. Record money from a
+  supplier as a vendor refund or payment
+- a deposit, an entry created from a statement line, or a settlement may take
+  out of an account that holds received payments (Undeposited Funds, a
+  clearing account, or any account receipts are paid into) only what it holds
+  from its date onward. `BANK_DEPOSIT_EXCEEDS_HELD_FUNDS` / `FUNDS_EXCEED_HELD`
+  means the payments were already deposited (find the earlier deposit in
+  `bank-deposits` and reverse the duplicate) or the receipt is not recorded
+  yet (record it first). When the message says the account is below zero,
+  open the bookkeeping review (`RECEIVED_PAYMENTS_ACCOUNT_BELOW_ZERO`) and
+  reverse the duplicate deposit first. Never work around it with a manual
+  journal. Prepaid, inventory or shareholder accounts are not checked
+- `settlements/{id}:replace` with `lines` takes gross, fee and net from the
+  lines; send summary amounts only if they should be checked against them
+- link a settlement only to posted sales receipts that no other settlement has
+  settled (`SALES_RECEIPT_NOT_POSTED`, `SALES_RECEIPT_ALREADY_SETTLED`); to
+  move a receipt to another settlement, replace or reverse the settlement that
+  holds it first. A sales receipt a settlement has settled keeps its amount,
+  currency, exchange rate and payment account; to change those, replace or
+  reverse the settlement first
+- a settlement matched to a bank statement line keeps that line's amount as its
+  net payout when replaced (`SETTLEMENT_BANK_MATCH_NOT_KEPT`); to record a
+  different payout, unmatch the line first (`bank-lines/{id}:unmatch`), then
+  replace the settlement and match again
+- a statement line in the book's currency matches an entry by its
+  book-currency amount whatever the document's currency (a USD receipt
+  deposited to a CAD bank matches the CAD the bank credited); a line in another
+  currency matches only entry lines in that currency. FX remeasurement entries
+  are never bank activity and cannot be matched (`ENTRY_NOT_BANK_ACTIVITY`)
+- FX runs revalue a bank or card account only in the currencies of its
+  imported statement lines; an account with no imported statement is still
+  revalued in every currency on it, so import the statement before the first
+  FX run on an operating bank that received foreign receipts. Foreign receipts
+  or payments through an account whose statement is in the book's currency
+  stay at what they posted; preview rows with `basis: posted_amounts` reverse
+  earlier revaluation of money the bank converted
+- reverse FX remeasurement runs latest first
+  (`FX_REMEASUREMENT_REVERSE_OUT_OF_ORDER`). Remeasurement posts to account
+  7999, which must be the active FX gain/loss account
+  (`FX_GAIN_LOSS_ACCOUNT_INVALID`); if 7999 is used for something else, ask
+  the person before recoding accounts
+- date an FX remeasurement run on or after the latest standing run
+  (`FX_REMEASUREMENT_OUT_OF_ORDER`); to measure an earlier date, reverse the
+  later run first
+- an account's statement role, receivables/payables role and AR/AP report
+  category are fixed once it has entries or statement lines
+  (`ACCOUNT_KIND_LOCKED`); to use another role, create a new account and move
+  the balance with a journal entry
+- if cancelling, replacing or reversing a receipt is refused because a deposit
+  already took that money (`RECEIVED_PAYMENTS_ALREADY_DEPOSITED`), choose by
+  what happened: if the deposit is wrong, reverse or correct the deposit first,
+  then change the receipt; if the money really was deposited and the bank
+  later returned it (a bounced cheque or a reversed payment), leave the receipt
+  and the deposit as they are and record the return from the bank statement
+  line (for a customer receipt, unapply it to reopen the invoice, then record a
+  customer refund paid from the bank account)
+- to correct an old deposit that cleared foreign money in the book currency,
+  use one journal entry or two (for example through a suspense account): put
+  the book-currency amount back on the clearing account and take the foreign
+  money out in its own currency
+- record the sales receipts a payout covers before recording the settlement;
+  settlement links flagged in the bookkeeping review are fixed by replacing the
+  settlement without that sales receipt, or by reversing it
+- paying a foreign credit card clears the card at its carried amount, also
+  when the bank converted the money or you pay more than the card owes; only
+  the amount above the balance is recorded at the payment's rate. Settlements,
+  deposits and transfers report the realised gain or loss in
+  `exchange_difference`
+- after unmatching, ignoring or restoring a statement line in a completed
+  reconciliation, check `warnings` for `RECONCILIATION_NEEDS_REVIEW` and
+  reconcile the account again
+- funds held in another currency than the book's (a USD sale in Undeposited
+  Funds or a processor clearing account, a EUR bank account) move in their own
+  currency; Vibooks relieves the account at what it carries them at and books
+  the realised difference on 7999. Within the book's currency, `exchange_rate`
+  is 1 or left out
+  - `bank-deposits`: `currency` plus `exchange_rate` (bank account in that
+    currency) or `converted_amount` (what the bank credited in the book's
+    currency)
+  - `transfers`: `currency` (sent) and `amount`; when the receiving account
+    takes another currency, `to_currency` and `received_amount` from the
+    receiving bank's statement; `exchange_rate` (book currency per unit of the
+    received currency) only when the received currency is foreign and neither
+    side is the book's currency. A book-currency transfer is never refused
+    because a bank also holds another currency
+  - `bank-lines/{lineId}:create-entry`: `exchange_rate` for a line in another
+    currency; when the bank converted funds a clearing account holds (a USD
+    line clearing EUR from Undeposited Funds), `currency` and `funds_amount`
+    (the EUR amount). A foreign outflow line relieves the bank at carrying when
+    it holds those units. `:create-receipt` and `:create-payment` take
+    `exchange_rate` for a foreign line
+  - `settlements`: `currency` and `exchange_rate` of the payout; the clearing
+    line is relieved at carrying automatically
+  - a book-currency line that would take funds a clearing account (not a bank
+    or card account) holds in another currency is refused with
+    `FOREIGN_FUNDS_CURRENCY_REQUIRED` (`BANK_DEPOSIT_FOREIGN_FUNDS_CURRENCY_REQUIRED`
+    for deposits), naming the currency to send. `FOREIGN_FUNDS_EXCEED_HELD`
+    (`BANK_DEPOSIT_EXCEEDS_HELD_FUNDS`) means the account holds less of that
+    currency than requested: record the missing receipt first.
+    `FOREIGN_FUNDS_ALREADY_CLEARED` (`BANK_DEPOSIT_FUNDS_ALREADY_DEPOSITED`)
+    points to an entry an earlier version recorded in the book's currency:
+    reverse it (the bookkeeping review lists it) and record it again in the
+    funds' currency. Read `exchange_difference` on deposits and transfers for
+    the realised gain (positive) or loss
+- if the `document_consistency_review` task lists
+  `CONTROL_ACCOUNT_POSTED_WITHOUT_DOCUMENT`, reverse that deposit with
+  `bank-deposits/{id}:reverse`, then record the receipt or payment.
+  `FOREIGN_FUNDS_CLEARED_IN_BOOK_CURRENCY` (subject `bank_deposit`,
+  `bank_line` or `settlement`) and `FOREIGN_CURRENCY_POSTED_AT_RATE_ONE`
+  (subject `bank_line`) list only entries recorded before the book upgraded to
+  1.6.3, and only clearing accounts (never bank or card accounts). They are
+  read-only: confirm with the person, reverse the entry, and record it again in
+  the funds' currency or at the day's exchange rate; a currency truly at par
+  with the book's needs no change
 - do not replace receipt or payment application with ad hoc journal lines
   against AR or AP control accounts
 - if a document or settlement uses a non-default control account, pass the
@@ -720,6 +950,44 @@ Subledger integrity rules:
   payroll profile, schedule, statutory payroll items, jurisdiction, and verified
   YTD history before calculation; use the employee payroll-calculation preview
   instead of entering tax deductions as operator-calculated amounts
+- when payroll readiness (`GET /v1/books/{bookId}/payroll-rule-readiness`)
+  lists `advisory_findings`, the corrected payroll formulas apply to new
+  payroll only: calculate and post new payroll as usual, and do not reverse or
+  replace a listed run for that difference. For each finding whose
+  `employer_action` is `notify_employee`, make sure the employer tells the
+  employee that too little income tax was withheld (they can ask for
+  additional tax on their remaining pays this year or pay the difference when
+  they file; the T4/RL-1 shows the tax actually withheld), then record it with
+  `POST /v1/books/{bookId}/payroll-advisory-findings:acknowledge`
+  `{finding_ids, note?}`; over-withheld and no-net-change findings need no
+  action. A correction matter whose `correction_state` is
+  `handled_by_advisory_finding` stays protected: don't reverse or replace its
+  run (its correction steps return `409 PAYROLL_CORRECTION_ADVISORY_FINDING`)
+- date a payroll YTD opening balance on or before the first Vibooks pay date;
+  one dated on a pay date counts in that payroll's year to date, and a signed
+  correction counts from the next pay date. A draft calculated before such a
+  change is refused at post with `PAYROLL_YTD_BASIS_CHANGED`: calculate again
+- a payroll run's `cash_account_id` must name an existing cash, bank or
+  clearing account, or be `__auto__` for Operating Cash; an unknown account is
+  refused with `ACCOUNT_NOT_FOUND`
+- a payroll correction (a replacement, or a new run for the same pay date
+  after a reversal) keeps the accounts the original run posted; choose a
+  payroll liability or expense account only for new payroll lines. To change
+  an existing payroll item's accounts, create a new version of the same item
+  code starting at the next pay period; it ends the old version and moves its
+  employees
+- read the `vacation_settlement_review` tasks for vacation pay still owed
+  after termination and vacation payouts not linked to the vacation records;
+  link actionable payouts with their `link_request`, in pay-date order per
+  employee; act on `reason_code`, never on the English text; items marked
+  needs review go to the person's accountant or wait for the step they name
+- payroll account fields (an employee's default liability, payroll item and
+  run accounts, the split of an external register's withholdings, vacation pay
+  accounts, employer insurance accounts, and a remittance's funding and
+  authority credit accounts) never take Accounts Receivable, Accounts Payable,
+  Customer Deposits or Vendor Advances; use a payroll liability, expense, cash
+  or clearing account. A refusal names the field
+  (`CONTROL_ACCOUNT_DOCUMENT_REQUIRED`)
 - before any Canadian payroll calculation preview, show the live request
   schema's unsupported special-tax-situation list to the operator. Send
   `unsupported_tax_situations_confirmed_absent: true` only after the operator
@@ -730,8 +998,41 @@ Subledger integrity rules:
   successor employee payroll profile through the payroll-profile API. The
   server atomically closes the unique predecessor on the prior calendar day and
   keeps historical selection intact. Never overwrite the earlier profile or
-  patch its dates directly; same-start, future, or ambiguous overlaps fail
-  closed and require reviewing the retained profile timeline
+  patch its dates directly; future or ambiguous overlaps fail closed and
+  require reviewing the retained profile timeline
+- a version with the same `effective_from` as an existing version of that
+  employee replaces it, but only when no payroll used it (no payroll run, run
+  generation, statutory dependency or pay statement names it). The response
+  names the replaced version in `replaced_profile_id`, and an omitted
+  `effective_to` keeps the replaced version's end. A version a payroll used is
+  refused with `PAYROLL_PROFILE_VERSION_USED`: correct it with a version
+  starting the next day. Recalculate after a replacement: a draft built on the
+  replaced version gets `PAYROLL_PROFILE_CHANGED` at post
+- before setting up Quebec employees, record the employer's Health Services
+  Fund setting once (`POST /v1/books/{book_id}/payroll/quebec-hsf-settings`;
+  read it with `GET ...?on=<date>`). Ask for the employer's first year of HSF
+  liability; in the first two years send the total payroll it expects to pay
+  in the year, afterwards last year's RL-1 summary line 28. Start it on the
+  read's `earliest_allowed_start`, add a new version when the figure changes,
+  and never start one over payroll already paid. Under a setting, omit
+  `quebec_hsf_employer_type` and `quebec_hsf_total_payroll` from profiles and
+  calculations
+- where no employer setting covers a date, the Quebec Health Services Fund
+  rate is still one rate per employer: the Quebec profiles of active
+  employees in effect on a pay date must state the same
+  `quebec_hsf_employer_type` and `quebec_hsf_total_payroll` (the employer's
+  total payroll including associated employers); otherwise calculation and
+  every post (single, batch, replace, correction) fail with
+  `PAYROLL_QUEBEC_HSF_EMPLOYER_INPUTS_INCONSISTENT`, naming each employee,
+  profile and start. Give the employer's values to a version in effect on the
+  pay date (append one after that profile's start, or use the same start for a
+  version no payroll used). If a posted payroll used a version with wrong
+  values, start that employee's correction the next day and review that
+  payroll's HSF with the person's accountant; align the other employees to a
+  used version only when its values are the employer's. To change the estimate
+  during the year, append a version for every Quebec employee from the same
+  date. On a new Quebec profile, omit both fields to inherit the employer's
+  values; send them when no other Quebec profile is in effect on that date
 - before an ordinary Canadian payroll post, read
   `/v1/books/{book_id}/payroll-rule-readiness`. Vibooks runs the same idempotent
   check automatically when Payroll opens and before calculation, batch creation,
@@ -1027,6 +1328,16 @@ Subledger integrity rules:
   fingerprint unchanged into individual or batch post. A missing/mismatched
   fact, unpublished pay-date rule, unsupported earning meaning or incomplete
   setup must stop before any payroll, journal or statement mutation
+- a payroll replacement keeps the pay date in the original run's accounting
+  period and calendar year (`PAYROLL_REPLACE_PERIOD_CHANGE` otherwise): to
+  move a run to another period or year, reverse it on its own date and post a
+  new run. A run that a prepared remittance reports cannot be reversed or
+  replaced until that remittance is cancelled; a paid one needs a separate
+  adjustment. Reversing or replacing a run also reverses the vacation accrual
+  it owns. A run with a pay statement can be replaced only by a payroll
+  calculated in Vibooks (`PAY_STATEMENT_REPLACEMENT_NATIVE_CALCULATION_REQUIRED`
+  otherwise): to record a payroll calculated elsewhere for it, reverse the run
+  and post the corrected payroll as a new run
 - reverse or replace Canadian payroll only with the complete retained
   employee/profile identity, calculation release/snapshot/fingerprint,
   pay-statement facts, detailed component arrays, cash account, date, and
@@ -1093,7 +1404,26 @@ Subledger integrity rules:
   A corrected confirmation uses `:correctReference` and does not rewrite the
   journal. Reverse or replace a mistaken recorded payment only through
   `:withdrawPayment` or `:replacePayment` so the original fact, reversal entry,
-  and successor stay in the append-only history. Do not substitute an installed
+  and successor stay in the append-only history. To correct a payroll run that
+  a prepared, unpaid remittance reports, call `:cancel` on the remittance with a
+  reason, correct the run, then preview the period again and prepare it from the
+  fresh preview fingerprint; the new preparation continues the cancelled
+  record's lineage as its next revision. A current prepared record still
+  refuses a second preparation with `PAYROLL_REMITTANCE_PERIOD_EXISTS`.
+  Posting, batch posting or replacing a run whose pay date falls in the period
+  of a prepared or paid remittance (CRA, or Revenu Québec for a Quebec
+  employee) is refused with `PAYROLL_REMITTANCE_PERIOD_ALREADY_PREPARED` or
+  `PAYROLL_REMITTANCE_PERIOD_ALREADY_PAID`, naming the remittance: withdraw
+  each recorded payment (`:withdrawPayment`), cancel the remittance
+  (`:cancel`), post the run, prepare the period again (preview, then create),
+  then record the payment already made plus the shortage remitted to the
+  authority. Reversing or replacing a payroll run also reverses the
+  vacation-pay payments that settled its vacation payout in the same step
+  (`vacation_payment_reversals`); do not reverse them separately. After a
+  replace or statutory correction, if `vacation_payout_relink.required` is
+  true, link a new vacation payment to one of
+  `replacement_vacation_pay_component_ids`; when false, the reversed amounts
+  stay owed. Do not substitute an installed
   monthly or quarterly calendar for an unsupported accelerated, weekly, or
   twice-monthly obligation, and do not claim authority receipt from the Vibooks
   record alone
@@ -1242,6 +1572,22 @@ Subledger integrity rules:
   completed Block 15A total up to the next whole hour once, not per period or
   payment. The live API contract determines which fields the connected version
   supports; do not send newer fact shapes to a version that does not advertise them.
+  For Block 17C, use the definition's other-monies catalog items; Vibooks
+  reports each under its ROE Web Appendix D Table 12 code (closure_bonus and
+  loyalty_bonus B10, event_bonus B07, holiday_bonus B05, production_bonus B06,
+  retention_bonus B08, separation_bonus B09, employer_controlled_gratuities
+  G00, accumulated_overtime T00, pay_in_lieu_of_notice Y00, retiring_allowance
+  R00, severance_pay E00, honorarium H00). severance_pay, retiring_allowance and
+  honorarium are not insurable, so their supplemental amounts are not added to
+  Block 15B or the last pay period. A pay_adjustment has no single code (J00 or
+  O00): the draft export refuses it, so complete Block 17C in ROE Web from the
+  worksheet. Blocks 15B and 15C are each period's EI insurable earnings from
+  the posted calculation, not gross pay; mark pay that is not insurable in
+  payroll before preparing. If a draft export returns `ROE_ARTIFACT_STALE`
+  because the worksheet's Blocks 15A to 15C differ from the payroll records,
+  create the corrected successor (below) and export that one; never edit the
+  retained worksheet. If the person already issued an ROE from an earlier
+  worksheet, tell them to check it and amend it in ROE Web.
   If Block 19 special payments or another unsupported field applies,
   stop instead of approximating it. Only Service Canada supplies the official
   ROE PDF after issue. Optional external-completion evidence records only what
@@ -1268,7 +1614,11 @@ Subledger integrity rules:
   reporting; do not recreate vacation liability through generic payroll
   deductions or manual journals. Vacation post/reversal responses expose any
   pay-statement successor IDs; follow those immutable successors instead of
-  continuing to use a superseded statement revision
+  continuing to use a superseded statement revision. This includes a monthly
+  vacation reassessment (and the provision transfer it posts) and a Northwest
+  Territories vacation correction: read `pay_statement_successor_ids` in the
+  response and give the employees the reissued statements, including those of a
+  later calendar year
 - treat each source earning meaning and earned-date segment as protected input;
   unknown semantics, uncovered dates, incomplete service or coverage, and rule
   gaps fail closed instead of falling back to taxable wages or a prior release;
@@ -1380,18 +1730,81 @@ Subledger integrity rules:
   until a complete append-only `legacy_run_attestation` links the posted run to
   retained source records and supplies every applicable employee and employer amount;
   never overwrite either the retained snapshot or attestation for later changes;
+  a `legacy_run_attestation` must agree with the covered run: each statutory
+  amount equals the run's component coded for it (`cpp`, `ei`,
+  `federal_income_tax`, `employer_cpp`…), and the employee and employer amounts
+  each total no more than `withholding_tax` and `employer_tax`, otherwise
+  `PAYROLL_LEGACY_ATTESTATION_RUN_MISMATCH`; on a summary external run every
+  `liability_allocations[i].account_id` must be an active liability account;
+  reversing or replacing an attested external run reverses its attestation in
+  the same transaction (listed in the response's `legacy_attestation_reversals`).
+  An attestation counts toward YTD, T4 and remittances only while its run is
+  posted, still external and not replaced since it was recorded; after
+  replacing a run with a corrected external register, attest the corrected
+  register before automatic calculation, slips or remittances use it;
+  date a payroll history adjustment's reversal on or after the adjustment's
+  `effective_date`, in the same tax year;
   a restore needs the person's go-ahead and the preview's phrase (see Backup,
   Restore And Deletion in `references/install-access.md`)
 - when purchase-side tax is only partly claimable, keep the statutory
   `tax_code_id` on the purchase line and set `tax_claimable_ratio` between `0`
   and `1`; Vibooks will keep the non-claimable portion inside the business
   line and only carry the claimable portion into tax returns
+- for imported services or other purchases the supplier did not tax (reverse
+  charge), code the purchase line with a tax code whose
+  `purchase_rule.treatment` is `reverse_charge`, with an input-tax asset
+  component and a self-assessed liability component (`settlement_effect:
+  none`), and set `tax_claimable_ratio` for the share used in commercial
+  activities; the return reports the full self-assessed tax and only the
+  claimable ITC, so never post the self-assessment by hand. In Canada, an
+  imported service acquired for use exclusively in commercial activities needs
+  no self-assessment, so do not give it a reverse-charge tax code
 - if a transaction is partially settled, keep the remaining open amount in the
   subledger instead of forcing full settlement
 - use inventory adjustments only for stock counts, shrinkage, spoilage,
-  reclassifications, opening stock corrections, or other true exceptions; do
-  not split normal buy/sell activity into both a source document and a second
-  manual inventory movement
+  reclassifications, or other true exceptions; do not split normal buy/sell
+  activity into both a source document and a second manual inventory movement
+- create each inventory item without stock, then record its opening stock with
+  `items/{item_id}:record-opening-stock` (`quantity`, `unit_cost`,
+  `opening_date` = the conversion date) before any other activity of the item;
+  that is two calls per item, each with its own idempotency key. Never load an
+  opening inventory position with a manual journal entry, whatever its label
+- tracked items never also go in the opening balances; Vibooks refuses it
+  either way. Untracked stock in the opening balances goes on an account no
+  item uses. After a correction against Opening Balance Equity, an opening
+  balance re-entered with the inventory line is refused; leave that line out
+- if an item's read shows `unrecorded_opening_stock` (stock an earlier version
+  stored), record it with `existing_stock: true` unless its value is already in
+  the opening balances; if that date falls in a closed period, reopen the
+  periods from the latest back to it first
+- correct an opening count or value found wrong after later activity with
+  `:correct-opening-stock`, not `:adjust`; name `equity_account_id` only for an
+  item with no recorded opening whose `unrecorded_opening_stock` is set
+- inventory movements cannot be removed with batch delete; reverse a movement
+  with `inventory-adjustments/{adjustment_id}:reverse`, which restores its
+  quantity and value together. Deleting a draft journal entry with batch
+  delete also deletes its lines and attachment links and withdraws the
+  approvals requested to post it; request a new approval for a replacement
+  draft
+- an inventory movement needs an open period on its posting date even when its
+  value rounds to zero; a movement on an item whose stored value cannot cover
+  it is refused with `INVENTORY_VALUE_UNAVAILABLE` (review the item's value
+  with the person before adjusting it)
+- inventory movements belong to the workflow that recorded them; each
+  movement's `source_type` says which. Reverse a movement with
+  `inventory-adjustments/{id}:reverse` only when `source_type` is
+  `inventory_adjustment` (a receive, issue, adjust or revalue entered by hand)
+  and it is the item's latest posted movement. For any other `source_type`
+  (invoice, credit_note, sales_receipt, customer_refund, bill, expense,
+  purchase_receipt, vendor_credit, vendor_refund), correct the document
+  instead: void, replace or credit it, cancel or replace a vendor credit, or
+  reverse a credit note. That also reverses its stock; the movement route
+  refuses it with `INVENTORY_REVERSE_USE_DOCUMENT_WORKFLOW`
+- manual receive, issue, adjust and revalue post to the item's own inventory
+  account, and an issue to the item's cost of goods sold account; do not send
+  `inventory_account_id` (another account is refused with
+  `INVENTORY_ACCOUNT_MISMATCH`); send `offset_account_id` only to choose the
+  other side, for example a spoilage expense account
 
 Reimbursement and vendor-advance rule:
 
@@ -1578,14 +1991,22 @@ activity or a later run covers it.
   account
 - bank deposit: prefer `bank-deposits`; economically it debits the destination
   bank statement account, credits positive source lines such as cash, tax
-  receivable, clearing, revenue, equity, loan, or holding balances, and debits
+  receivable, clearing, revenue, equity, or loan balances, and debits
   negative deduction lines such as merchant fees so the deposit matches the
   bank's net amount
 - platform payout, merchant-processor remittance, OTA remittance, or other
   net settlement without customer-level sale evidence: prefer flexible
   `settlements` with `lines[]`; economically it ties gross activity, fees,
-  refunds, reserves, taxes, custom adjustments, and net cash to one
-  source-aware event
+  refunds, reserves, custom adjustments, and net cash to one source-aware
+  event. If the payout includes sales tax the business collected, record the
+  batch's sales as one tax-coded `sales-receipt` to the clearing account and
+  settle that; if the fees carry GST/HST the business can claim, record the
+  whole fee, tax included, as a tax-coded `bill` or `expense` paid from the
+  clearing account, and put the fee on the settlement as a line on that
+  clearing account (not on the fee expense account, which the bill already
+  debits). A
+  settlement line on a sales tax account is refused
+  (`SETTLEMENT_TAX_ACCOUNT_NOT_ALLOWED`)
 - summary-based restaurant or small-lodging close: use sales receipts,
   expenses, receipts or payments, and settlements plus dimensions such as
   store, channel, or property; do not model POS or PMS front-office activity

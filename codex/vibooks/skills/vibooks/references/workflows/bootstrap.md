@@ -167,7 +167,10 @@ Run setup in this order:
 11. choose and apply an official Vibooks preset when it matches the business
 12. create or review the chart of accounts
 13. create customers and vendors when needed
-14. load opening balances if migrating from prior books
+14. load opening balances if migrating from prior books (leave out stock of
+    tracked inventory items)
+14a. create inventory items without stock and record each item's opening stock
+    with `items/{item_id}:record-opening-stock`
 15. start routine posting only after the opening balances tie out
 
 Bootstrap defaults:
@@ -328,7 +331,10 @@ Recommended defaults for a normal small business:
   `invoice_rate` only when the official jurisdiction workflow or accountant-
   approved policy requires invoice/rate-level tax rounding, such as Japanese
   qualified-invoice consumption-tax books
-- `year_close_mode`: `closing_entries`
+- `year_close_mode`: `report_time_rollforward` — Vibooks closes each fiscal
+  year at report time and the balance sheet carries earlier years' earnings in
+  Retained Earnings; do not post closing entries (a hand-posted closing entry
+  would zero that year's income statement)
 - `tax_mode`: `none` unless the user explicitly wants tax-coded bookkeeping
 
 Do not treat UI display formatting as a substitute for posting precision. For
@@ -345,3 +351,19 @@ When tax registration or tax handling changes later:
 - when the new policy omits `effective_to`, Vibooks automatically ends the
   previously effective policy on the prior day
 - do not leave overlapping policy ranges in place
+- every policy version of a book keeps the same `functional_currency` and
+  `posting_scale`; Vibooks refuses a version that differs from the versions
+  before and after it (`POLICY_FUNCTIONAL_TERMS_LOCKED`), with or without
+  activity, because it does not translate balances at the date of a change.
+  Copy both from the current version (send `posting_scale` explicitly when
+  sending `scale`). A book with a single version corrects its currency with
+  `PATCH policies:effective` before any activity. If the business truly
+  changed its functional currency, stop and refer the person to their
+  accountant
+- `effective_from` must not fall in, and the version's range must not reach,
+  a closed period (`PERIOD_CLOSED`); `PATCH policies:effective` is refused
+  while any period of the fiscal year is closed. Use a later date or have the
+  person reopen the period first
+- a `policy_terms_review` task (`POLICY_FUNCTIONAL_TERMS_CHANGED`) means the
+  book's entries lie under two currencies or posting scales; never rewrite
+  entries to fix it, report it for accountant review
