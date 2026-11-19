@@ -4,6 +4,15 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-11-19
+
+- Bundles the Vibooks skill 1.6.2 for App 1.6.4:
+  - A payroll run without a current pay statement is reversed without pay statement facts.
+  - Payroll corrections that recalculate nothing need only the payroll module.
+  - Vacation pay calculations need Canadian Payroll for the Company, and the skill explains how to hand the vacation balance off to a payroll provider.
+  - Year-end acknowledgements and history or tax-form adjustment reversals work without Canadian Payroll.
+  - A Company subscription never authorizes native Canadian Payroll.
+
 ## [0.8.2] - 2026-11-16
 
 - Security: MCP tools pass every value to `vibooks-cli` as a plain value.

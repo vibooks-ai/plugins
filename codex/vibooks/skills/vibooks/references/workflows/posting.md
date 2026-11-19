@@ -1338,10 +1338,34 @@ Subledger integrity rules:
   calculated in Vibooks (`PAY_STATEMENT_REPLACEMENT_NATIVE_CALCULATION_REQUIRED`
   otherwise): to record a payroll calculated elsewhere for it, reverse the run
   and post the corrected payroll as a new run
+- a run without a current pay statement (an external run, or one posted
+  before the book's first pay statement) is reversed without
+  `pay_statement_facts` and `calculation_fingerprint`; send both together only
+  for a run whose pay statement is current. Such a reversal writes no
+  statement, and later pay statements get a revision only where their year to
+  date or vacation balance changes. `409 PAYROLL_GENERATION_MISSING` means a
+  run calculated in Vibooks has no pay statement record: stop and tell the
+  person to contact support, never post a substitute entry
+- a stated run, a vacation pay calculation, a recorded pay-statement
+  handoff, a payroll history adjustment and a T4/RL-1 box adjustment can be
+  reversed or corrected with the payroll module alone, as long as writes are
+  allowed (`payroll_authorization_class` `accounting_only` for `:reverse`, the
+  vacation calculation reverse, the handoff
+  `preview-correction`/`commit-correction` and the two adjustment `:reverse`
+  actions). Replacement and recalculation
+  still need Canadian Payroll for the company, and so does a reversal that
+  names a statutory correction plan for a run calculated in Vibooks. A
+  certified PEI run is the exception: it is reversed only with a statutory
+  correction plan (`PAYROLL_STATUTORY_CORRECTION_PLAN_REQUIRED` otherwise), and
+  creating that plan needs Canadian Payroll for the company or the run's
+  retained payroll source record; without either, tell the person it cannot be
+  reversed until Canadian Payroll is enabled again. After reversing, record the
+  corrected payroll as a new run
 - reverse or replace Canadian payroll only with the complete retained
   employee/profile identity, calculation release/snapshot/fingerprint,
-  pay-statement facts, detailed component arrays, cash account, date, and
-  correction reason required by the typed request. For standard or strict
+  pay-statement facts (for a run whose statement is current), detailed
+  component arrays, cash account, date, and correction reason required by the
+  typed request. For standard or strict
   approval, request `entry.reverse` approval for the exact request body, ask
   another person to approve it, and consume only an approved record
   whose `target_id` and `payload_hash` still match. If any date, fact, amount, account, or reason changes, request a new

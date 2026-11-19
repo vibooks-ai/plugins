@@ -147,9 +147,80 @@ current statutory readiness. Check the live entitlement and allocation state
 before calculation or posting. A standard bookkeeping subscription authorizes
 recording results supplied by an accountant or external payroll provider; it
 does not authorize Vibooks payroll calculation or employee pay-statement
-generation. Never consume a Payroll place without the owner's explicit
+generation. A Company subscription's Payroll places are payroll bookkeeping
+places too: from App 1.6.4 a Company subscription never authorizes native
+Canadian Payroll, even for a Company with Payroll enabled, and every native
+preview, calculation, post or pay statement is refused with
+`NATIVE_PAYROLL_LICENSE_REQUIRED`. Record the provider's or accountant's payroll
+results instead; native calculation needs the Canadian Payroll add-on on a
+quota subscription with a current Canadian Payroll place for the Company.
+Never consume a Payroll place without the owner's explicit
 selection. Once enabled, that place is fixed for the paid period; Company
 archive or deletion does not release it.
+
+Vacation pay setup, facts, previews and posts are Canadian Payroll
+calculations (`native_ca_current`). Without Canadian Payroll for the Company,
+read vacation records and reverse one that is wrong, in dependency order
+(payments, then closes and earnings, then openings).
+`VACATION_REVERSAL_DEPENDENCY` names a later record to reverse first;
+`VACATION_PAYROLL_REVERSAL_REQUIRED` means the record belongs to a payroll run,
+so stop and ask before reversing that run. Never reverse correct history to
+clear a balance. Do not retry a refused vacation post; read the calculation
+instead.
+
+When a payroll provider takes over vacation pay, hand off the Vibooks balance
+once:
+
+1. Correct wrong records first.
+2. Read the vacation settlement findings: every `VACATION_PAYOUT_NOT_LINKED`
+   (employee, pay date, `amount`) and `VACATION_OWED_AFTER_EMPLOYMENT_ENDED`.
+   Confirm with the person that each listed payout really was vacation pay
+   before subtracting it, and ask the person or the accountant about any null
+   `amount` or unconfirmed termination payment. A payout whose cause is
+   `VACATION_EARNING_NOT_POSTED` means a vacation accrual is missing from both
+   the records and the ledger: the accountant determines the missing amount,
+   adds it to that employee's hand-off balance and posts it as vacation pay
+   expense to the provider's account.
+3. Read `GET …/vacation-pay/report?as_of=<day before the cut-over>`;
+   `liability_reconciliation.difference` must be `0.00` or equal minus the
+   listed unlinked payouts dated before the cut-over. Stop and ask about any
+   other remainder.
+4. Each employee's hand-off balance is the report's owed balance less that
+   employee's listed unlinked payouts and any balance confirmed as already paid
+   at termination. Give the provider these, never the raw report figures, or
+   vacation pay may be paid twice.
+5. Create a liability account for the provider's vacation pay (never one
+   configured in vacation setup).
+6. Create and post one `adjustment` journal entry
+   (`POST /v1/books/{book_id}/entries`, then post it) dated the cut-over that
+   debits each configured vacation pay payable account by its ledger balance
+   and credits the provider's account by the same total.
+7. The provider account should then equal the sum of the hand-off balances;
+   any remaining difference is a termination payout booked elsewhere,
+   corrected with the accountant.
+
+Afterwards record the provider's vacation accruals and payouts only to the
+provider's account. The vacation report then shows a constant difference equal
+to minus the frozen owed balance; the settlement review reports
+`VACATION_TRACKING_ENDED` / `VACATION_BALANCE_NOT_MOVED` whenever the payable
+accounts hold anything, and keeps listing the employee findings
+(`VACATION_CANADIAN_PAYROLL_REQUIRED`, their cause in
+`underlying_reason_code`) for reference. A vacation reversal after the
+cut-over needs a matching entry between the two accounts. If Canadian Payroll
+returns, reverse the cut-over entry before posting new vacation records.
+
+Do the hand-off only when a payroll provider really takes over. A licence that
+still includes Canadian Payroll but has no Canadian Payroll place for this
+Company in the current period (for example right after a subscription renews)
+makes the settlement review report `VACATION_TRACKING_PAUSED` with reason
+`VACATION_CANADIAN_PAYROLL_NOT_ENABLED`, not `VACATION_TRACKING_ENDED`. Tracking
+is only paused: ask the person to enable Canadian Payroll for the Company, and
+do not move the vacation pay payable balance or post a cut-over entry. Even
+with `VACATION_BALANCE_NOT_MOVED`, confirm with the person that a provider now
+manages vacation pay before the hand-off; otherwise they enable Canadian
+Payroll and the balance stays where it is. A finding with reason
+`INTERNAL_CHECK_FAILED` means Vibooks could not read the balance; report it
+instead of acting on it.
 
 If restore reconciliation reports more current-period Canadian Payroll
 allocations than the signed limit, do not calculate a new payroll result or try
@@ -434,7 +505,9 @@ effective legal identities, verified opening YTD facts, and signed box
 adjustments without blockers. Correct a box only through the employee's
 first-class `payroll-tax-form-adjustments` resource and reverse an incorrect
 adjustment through its reversal action; never rewrite a posted payroll snapshot
-or YTD history to force a slip total.
+or YTD history to force a slip total. Reversing a payroll history adjustment or
+a T4/RL-1 box adjustment needs only the payroll module; adding one needs
+Canadian Payroll.
 
 In January, read `GET /v1/books/{book_id}/payroll/year-end/obligations` and
 tell the person each T4 and RL-1 due date (calendar dates from installed
@@ -442,10 +515,13 @@ calendars; `due_date_reason` explains a date that differs from the statutory
 one). Record CRA upload evidence for T4 files Vibooks produced through
 `/v1/books/{book_id}/statutory-export-intents/{intentId}/external-evidence`
 (`action_kind: cra_return_submission`). Use
-`…/year-end/obligations/{obligationId}:acknowledge` (`handled_on`, `method`
-`filed_outside_vibooks`, `payroll_provider` or `not_required`, optional
-`reference`, `reason`) only for what the person tells you was done outside
-Vibooks, with their words as `reason`; `:retractAcknowledgement` undoes it.
+`…/year-end/obligations/{obligationId}:acknowledge` (`handled_on` not after
+the book's today, `method` `filed_outside_vibooks`, `payroll_provider` or
+`not_required`, an optional `reference` without nine or more digits, `reason`)
+only for what the person tells you was done outside Vibooks, such as slips a
+provider or accountant filed or an obligation that does not apply, with their
+words as `reason`; `:retractAcknowledgement` with a reason undoes it. Both need
+only the payroll module; Canadian Payroll is not required.
 `evidence_recorded` and an acknowledgement never mean filed or accepted:
 describe an obligation that way only when authority evidence says so.
 
