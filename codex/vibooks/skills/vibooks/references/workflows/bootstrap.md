@@ -173,6 +173,25 @@ Run setup in this order:
     with `items/{item_id}:record-opening-stock`
 15. start routine posting only after the opening balances tie out
 
+### The Next Fiscal Year
+
+Posting needs a fiscal year whose periods contain the date; Vibooks does not
+create the next fiscal year by itself.
+
+- From 45 days before the latest fiscal year ends, the task
+  `next-fiscal-year:{book_id}` (family `fiscal_year`) proposes the next year.
+  Run its fix action (`POST /v1/books/{book_id}/fiscal-years` with the task's
+  `body`) once the person agrees, or when they asked you to keep the books
+  posting.
+- A posting refused with `VALIDATION_FAILED` "posting date is outside all
+  periods" carries facts in `error.details[0]`. Only when they include
+  `next_fiscal_year_start` and `next_fiscal_year_end`, create exactly that one
+  year and retry once.
+- Never create a year for any other shape (`date_beyond_next_fiscal_year`, a
+  date before `first_fiscal_year_start`, or a `gap_start`/`gap_end` gap): the
+  date is usually a typo, so ask the person to check it. Never create more than
+  one fiscal year for one refused posting without the person's confirmation.
+
 Bootstrap defaults:
 
 - infer the first book name from the owner or business profile when it is clear

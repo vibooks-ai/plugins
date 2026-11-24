@@ -146,6 +146,11 @@ shipped product actually exposes one.
 - keep payroll liabilities, sales-tax liabilities, and income-tax liabilities
   separate; do not net them together into one generic tax bucket
 - do not infer payroll, withholding, or 1099 handling from country alone
+- Vibooks calculates no US payroll: record the payroll provider's or
+  accountant's results with `payroll-runs:recordExternal` (one run per
+  employee from the provider's register, the book's own wage, employer-tax and
+  liability accounts), and pay the IRS and the state agencies with an expense
+  to those liability accounts
 
 Common additions that may be appropriate when the business facts require them
 include:

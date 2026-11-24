@@ -4,6 +4,15 @@ All notable changes to the Vibooks Agent Plugin are documented here.
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-11-24
+
+- Bundles the Vibooks skill 1.6.3 for App 1.6.5:
+  - An accountant's or payroll provider's results are recorded as payroll runs (`payroll-runs:recordExternal`) in every market, under any license with payroll; Canadian Payroll is needed only for the in-app Canadian calculation. Before App 1.6.5, the skill asks the user to update, or records a journal entry meanwhile.
+  - Printed customer notes and the book's confirmed payment instructions on invoices.
+  - Document memos versus printed line text, status tokens and template checks.
+  - The next fiscal year task and the facts a posting refusal returns.
+  - Canadian payroll correction rules live in the Canada profile.
+
 ## [0.8.3] - 2026-11-19
 
 - Bundles the Vibooks skill 1.6.2 for App 1.6.4:

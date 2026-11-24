@@ -118,11 +118,15 @@ follow the returned billing/support recovery actions; do not try to move or
 clear an allocation locally.
 
 Native Payroll is optional and requires the exact country module, current-period
-allocation, matching Company country and statutory readiness. Standard
-bookkeeping can still record payroll results supplied by an accountant or
-external payroll provider; that accounting workflow does not authorize Vibooks
-calculation, employee pay-statement generation or another country's native
-Payroll.
+allocation, matching Company country and statutory readiness. Every license
+with payroll (`payroll` or `payroll.accounting`: a quota subscription with or
+without Canadian Payroll, a company subscription for every assigned company
+with or without a payroll place, a trial, an earlier license) records payroll
+results supplied by an accountant or external payroll provider as payroll runs
+(`payroll-runs:recordExternal`), in any market; that accounting workflow does
+not authorize Vibooks calculation, employee pay-statement generation or another
+country's native Payroll. A license without payroll is refused with
+`ENTITLEMENT_MODULE_REQUIRED`.
 
 An existing `company_subscription_v1` License keeps its shipped server-assigned
 Company semantics until its stated expiry or an explicitly confirmed successor.

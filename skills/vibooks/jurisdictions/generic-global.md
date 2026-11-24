@@ -27,6 +27,11 @@ This profile is a safe fallback, not a claim that the book has no local rules.
 4. build only the accounts and master data the source documents and business
    facts actually require
 
+Payroll: Vibooks calculates no payroll outside Canada. Record the results an
+accountant or payroll provider supplies with `payroll-runs:recordExternal`
+(one run per employee, the book's own accounts, amounts in the book currency's
+decimals) and pay each authority with an expense to the liability accounts.
+
 ## Rules
 
 - treat explicit book or company setup as authoritative when it already exists

@@ -94,6 +94,13 @@ Current official product path:
 Do not claim that Vibooks files Japanese corporation tax or consumption tax
 returns unless a shipped product release actually exposes that filing workflow.
 
+Vibooks calculates no Japanese payroll. Record the results a 社会保険労務士,
+accountant or payroll service supplies with `payroll-runs:recordExternal`: one
+run per employee from the per-employee register, in whole yen, with the book's
+own accounts for wages, employer social-insurance contributions and each
+liability (健康保険, 厚生年金, 雇用保険, 源泉所得税, 住民税 as the provider labels
+them). Pay each payee with an expense to those liability accounts.
+
 ## Chart-Of-Accounts Rules
 
 - start from the official Vibooks generic or industry preset, then add Japan-

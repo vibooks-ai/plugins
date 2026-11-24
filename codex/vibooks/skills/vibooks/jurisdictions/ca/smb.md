@@ -144,16 +144,32 @@ Canadian chart package unless the shipped product actually exposes one.
 Native Payroll requires the exact Canadian native module, an unused purchased
 Canadian Payroll place explicitly enabled for the local Canadian Company, and
 current statutory readiness. Check the live entitlement and allocation state
-before calculation or posting. A standard bookkeeping subscription authorizes
-recording results supplied by an accountant or external payroll provider; it
-does not authorize Vibooks payroll calculation or employee pay-statement
-generation. A Company subscription's Payroll places are payroll bookkeeping
-places too: from App 1.6.4 a Company subscription never authorizes native
-Canadian Payroll, even for a Company with Payroll enabled, and every native
-preview, calculation, post or pay statement is refused with
-`NATIVE_PAYROLL_LICENSE_REQUIRED`. Record the provider's or accountant's payroll
-results instead; native calculation needs the Canadian Payroll add-on on a
-quota subscription with a current Canadian Payroll place for the Company.
+before calculation or posting. Calculating payroll in Vibooks, pay statements,
+T4/RL-1 and ROE preparation and CRA/Revenu Québec remittance preparation need
+Canadian Payroll for the Company. Without it (a Company subscription with or
+without a payroll place, a quota license without the add-on or without a place
+for the Company, a trial), record the accountant's or payroll provider's
+results with `payroll-runs:recordExternal` (see the posting workflow), pay the
+Receiver General and Revenu Québec with an expense to the source-deduction
+liability accounts, and acknowledge year-end slips the provider filed as
+handled outside Vibooks. A Company subscription's payroll places are for
+Canadian companies; every company on it records external results, and native
+calculation needs the Canadian Payroll add-on on a quota subscription with a
+current Canadian Payroll place for the Company.
+
+A book that issues pay statements with Canadian Payroll calculates its runs in
+Vibooks (`:recordExternal` answers `PAY_STATEMENT_NATIVE_CALCULATION_REQUIRED`,
+or `PAYROLL_ALLOCATION_RECONCILIATION_REQUIRED` while the Company's allocation
+awaits reconciliation). After Canadian Payroll leaves the license, the same
+book records the provider's results without statements. When Canadian Payroll
+returns, attest each external run of the tax year from the provider's register
+(`legacy_run_attestation`) before calculating that employee again
+(`PAYROLL_YTD_INCOMPLETE` until then), and tell the employee the provider's
+statements cover those pay dates. Prepare Vibooks remittances only for periods
+calculated in Vibooks: a period whose liabilities were paid by expense, or that
+mixes them with runs calculated after the upgrade, is paid by expense too, and
+an external run without an attestation blocks remittance preparation for its
+period (`POSTED_PAYROLL_SNAPSHOT_MISSING`).
 Never consume a Payroll place without the owner's explicit
 selection. Once enabled, that place is fixed for the paid period; Company
 archive or deletion does not release it.
@@ -422,6 +438,36 @@ If Vibooks returns `PAY_STATEMENT_RULE_NOT_PUBLISHED`, missing confirmed facts,
 an unsupported earning meaning or incomplete setup, do not post the payroll or
 create a manual stub. Retain the evidence, correct setup or use an external
 payroll workflow until an exact verified rule interval exists.
+
+### Payroll Corrections Without Canadian Payroll
+
+These rules apply to Canadian books only; payroll runs and T4/RL-1 adjustments
+exist only there (US, Japanese and generic books record payroll with journal
+entries).
+
+- a run without a current pay statement (an external run, or one posted
+  before the book's first pay statement) is reversed without
+  `pay_statement_facts` and `calculation_fingerprint`; send both together only
+  for a run whose pay statement is current. Such a reversal writes no
+  statement, and later pay statements get a revision only where their year to
+  date or vacation balance changes. `409 PAYROLL_GENERATION_MISSING` means a
+  run calculated in Vibooks has no pay statement record: stop and tell the
+  person to contact support, never post a substitute entry
+- a stated run, a vacation pay calculation, a recorded pay-statement
+  handoff, a payroll history adjustment and a T4/RL-1 box adjustment can be
+  reversed or corrected with the payroll module alone, as long as writes are
+  allowed (`payroll_authorization_class` `accounting_only` for `:reverse`, the
+  vacation calculation reverse, the handoff
+  `preview-correction`/`commit-correction` and the two adjustment `:reverse`
+  actions). Replacement and recalculation
+  still need Canadian Payroll for the company, and so does a reversal that
+  names a statutory correction plan for a run calculated in Vibooks. A
+  certified PEI run is the exception: it is reversed only with a statutory
+  correction plan (`PAYROLL_STATUTORY_CORRECTION_PLAN_REQUIRED` otherwise), and
+  creating that plan needs Canadian Payroll for the company or the run's
+  retained payroll source record; without either, tell the person it cannot be
+  reversed until Canadian Payroll is enabled again. After reversing, record the
+  corrected payroll as a new run
 
 ### Payroll Remittances And Year-End Preparation
 
